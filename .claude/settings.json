@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(mvn -f backend test:*)",
+      "Bash(npm --prefix frontend test:*)",
+      "Bash(npm --prefix frontend run build:*)"
+    ],
+    "deny": [
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)"
+    ]
+  }
+}
