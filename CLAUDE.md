@@ -1,13 +1,13 @@
 # Reco-Resto
 
-Team project (4 contributors). Backend and frontend live in one monorepo and follow Spec-Driven Development (SDD).
+Team project (4 contributors). Backend and frontend live in one monorepo and follow Spec-Driven Development with Spec Kit.
 
 ## Stack and layout
 
 - `backend/`: Java 21, Spring Boot 4.1.1, Maven. Base package `hr.emocio.recoresto`.
 - `frontend/`: Angular 22.
-- `docs/specs/<feature>/`: SDD documents (spec, plan, task, impl, validation).
-- `.claude/`: shared agents and commands (`/sdd`). Personal overrides go in `.claude/settings.local.json` (ignored).
+- `specs/<NNN>-<feature>/`: Spec Kit documents (spec, plan, tasks, checklists). `.specify/`: Spec Kit templates, scripts and constitution.
+- `.claude/`: shared settings and Spec Kit skills (`/speckit-*`). Personal overrides go in `.claude/settings.local.json` (ignored).
 
 ## Commands
 
@@ -22,16 +22,17 @@ Team project (4 contributors). Backend and frontend live in one monorepo and fol
 - Tests first. Backend tests in `backend/src/test/java` (mirror the package of the class under test); frontend tests next to the code as `*.spec.ts`.
 - Agents never push and never open PRs; humans do. Agents commit only when asked.
 
-## SDD workflow
+## Spec Kit workflow
 
-Run `/sdd <need>`. Steps and pauses (the human validates each pause):
-1. `sdd-spec` → `spec.md` (WHAT/WHY, B/AC/T identifiers) — pause.
-2. `sdd-plan` → `plan.md` (architecture, contracts) — pause.
-3. `sdd-tasks` → `task.md` (tasks + traceability matrix) — pause.
-4. `sdd-impl` → code, tests, `impl.md`.
-5. `sdd-validate` → `validation.md` (verdict OK / TO FIX).
+Run the skills in order (the human validates each pause):
+1. `/speckit-specify <need>` → `specs/<NNN>-<feature>/spec.md` (WHAT/WHY) — pause.
+2. `/speckit-clarify` (optional) → resolve open questions in the spec.
+3. `/speckit-plan` → `plan.md` (architecture, contracts) — pause.
+4. `/speckit-tasks` → `tasks.md` — pause.
+5. `/speckit-implement` → code and tests (tests first).
+6. `/speckit-analyze` (optional) → cross-document consistency report.
 
-One feature per branch and per `docs/specs/<feature>/` folder. Details: `docs/specs/README.md`.
+One feature per branch and per `specs/<NNN>-<feature>/` folder. Details: `specs/README.md`.
 
 ## Never guess
 

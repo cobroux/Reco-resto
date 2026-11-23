@@ -1,6 +1,6 @@
 ---
 name: Feature
-about: Propose a new feature (it will go through /sdd)
+about: Propose a new feature (it will go through /speckit-specify)
 labels: feature
 ---
 

@@ -3,8 +3,8 @@
 
 Closes #<issue>
 
-## SDD
-- Spec folder: `docs/specs/<feature>/` (or "n/a: fix/chore")
+## Spec Kit
+- Spec folder: `specs/<NNN>-<feature>/` (or "n/a: fix/chore")
 - Validation verdict: <OK / TO FIX / n/a>
 
 ## Checklist

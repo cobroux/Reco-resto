@@ -4,7 +4,7 @@
 
 1. Open or pick an issue (templates in `.github/ISSUE_TEMPLATE/`).
 2. Create a branch from an up-to-date `main`: `feat/<slug>`, `fix/<slug>` or `chore/<slug>`.
-3. For a feature, run `/sdd <need>` and get each SDD pause validated (see `docs/specs/README.md`).
+3. For a feature, run `/speckit-specify <need>` and get each pause validated (see `specs/README.md`).
 4. Write tests first, then the minimum code (DRY: reuse or extend existing code).
 5. Commit with Conventional Commits: `feat: ...`, `fix: ...`, `docs: ...`, `test: ...`, `chore: ...`, `refactor: ...`.
 6. Push your branch and open a PR using the template; at least one teammate reviews and approves before merge.
