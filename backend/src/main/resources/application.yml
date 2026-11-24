@@ -1,0 +1,12 @@
+search:
+  default-radius-km: 2.5
+  deck-size: 15
+
+llm:
+  base-url: ${LLM_BASE_URL:}
+  api-key: ${LLM_API_KEY:}
+  model: ${LLM_MODEL:nova-lite}
+
+geocoder:
+  # Base URL of the API Adresse (data.gouv.fr). Not verified against the live service yet.
+  base-url: https://api-adresse.data.gouv.fr

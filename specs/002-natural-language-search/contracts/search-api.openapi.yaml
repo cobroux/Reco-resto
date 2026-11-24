@@ -1,0 +1,98 @@
+# Proposed contract. Paths and field names are NOT validated yet: to approve at plan review.
+openapi: 3.0.3
+info:
+  title: Reco-Resto search API
+  version: 0.1.0-draft
+paths:
+  /api/search:
+    post:
+      summary: Understand a sentence and return matching restaurants
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SearchRequest' }
+      parameters:
+        - name: includeZone
+          in: query
+          required: false
+          schema: { type: boolean, default: false }
+          description: Also return every restaurant of the search zone (FR-013).
+      responses:
+        '200':
+          description: Search succeeded (deck may be shorter than the deck size)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SearchResult' }
+        '422':
+          description: Search cannot be run; see error code
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: Search service unavailable (frontend shows "Réessayer")
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+components:
+  schemas:
+    Position:
+      type: object
+      required: [latitude, longitude]
+      properties:
+        latitude: { type: number }
+        longitude: { type: number }
+    SearchRequest:
+      type: object
+      required: [sentence]
+      properties:
+        sentence: { type: string, minLength: 1 }
+        position: { $ref: '#/components/schemas/Position' }
+    SearchCriteria:
+      type: object
+      properties:
+        cuisines: { type: array, items: { type: string } }
+        diets: { type: array, items: { type: string } }
+        combination: { type: object, description: AND/OR tree over cuisines and diets }
+        places: { type: array, items: { type: string } }
+        moment: { type: string, description: ISO 8601 date-time, or "now" }
+        distanceLimitMeters: { type: integer, nullable: true }
+    Restaurant:
+      type: object
+      required: [name, location, address]
+      properties:
+        name: { type: string }
+        location: { $ref: '#/components/schemas/Position' }
+        distanceMeters: { type: integer }
+        cuisine: { type: string }
+        diets: { type: array, items: { type: string } }
+        keywords: { type: array, items: { type: string } }
+        priceLevel: { type: string }
+        openingHours: { type: object, description: Weekly hours, shape to define with the data source }
+        photoUrl: { type: string }
+        signatureDish: { type: string }
+        address: { type: string }
+        phone: { type: string }
+        menu:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              description: { type: string }
+              price: { type: string }
+    SearchResult:
+      type: object
+      required: [criteria, deck]
+      properties:
+        criteria: { $ref: '#/components/schemas/SearchCriteria' }
+        deck: { type: array, items: { $ref: '#/components/schemas/Restaurant' } }
+        zone: { type: array, items: { $ref: '#/components/schemas/Restaurant' } }
+    Error:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          enum: [NOT_UNDERSTOOD, NO_RESULT, OUTSIDE_FRANCE, PLACE_REQUIRED, SERVICE_UNAVAILABLE]
+        message: { type: string }
