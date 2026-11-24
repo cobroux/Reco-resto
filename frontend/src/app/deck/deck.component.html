@@ -1,0 +1,92 @@
+<div class="page">
+  <header class="header">
+    <span class="logo"><span class="logo-mark" aria-hidden="true"></span>{{ texts.logo }}</span>
+    <button type="button" class="pill see-list desktop" (click)="openList()">
+      {{ texts.seeList }}
+    </button>
+  </header>
+
+  <main class="column">
+    @if (state()) {
+      <div class="progress-row">
+        <button
+          type="button"
+          class="rewind"
+          [attr.aria-label]="texts.rewind"
+          [title]="texts.rewind"
+          [disabled]="!canRewind()"
+          (click)="store.rewind()"
+        >
+          <span aria-hidden="true">&lt;</span>
+        </button>
+        <span class="progress-text">{{ texts.progress(position(), size()) }}</span>
+        <button type="button" class="pill see-list mobile" (click)="openList()">
+          {{ texts.seeList }}
+        </button>
+      </div>
+      <div
+        class="progress-bar"
+        role="progressbar"
+        aria-valuemin="1"
+        [attr.aria-valuemax]="size()"
+        [attr.aria-valuenow]="position()"
+        [attr.aria-label]="texts.progress(position(), size())"
+      >
+        <span [style.width.%]="(position() / size()) * 100"></span>
+      </div>
+
+      <h1 class="title">{{ title() }}</h1>
+
+      @if (state()!.refinementDegraded) {
+        <p class="degraded" role="status">{{ texts.degraded }}</p>
+      }
+
+      @if (cards().length) {
+        <div class="stack">
+          @if (hasNext()) {
+            <div class="peek" aria-hidden="true"></div>
+          }
+          @for (restaurant of cards(); track restaurant.id) {
+            <app-swipe-card
+              [restaurant]="restaurant"
+              [targetDateTime]="targetDateTime()"
+              [disabled]="store.pending()"
+              (swiped)="onSwiped($event)"
+              (left)="onLeft($event)"
+            />
+          }
+        </div>
+
+        <div class="actions">
+          @for (action of actions; track action.kind) {
+            <div class="action" [class.main]="action.primary">
+              <div class="round-wrap">
+                <button
+                  type="button"
+                  class="round"
+                  [class.primary]="action.primary"
+                  [attr.aria-label]="action.label"
+                  [disabled]="store.pending()"
+                  (click)="react(action.kind)"
+                >
+                  <span aria-hidden="true">{{ action.symbol }}</span>
+                </button>
+                <!-- D19: iPhone plays a system tick when a finger toggles a native switch. -->
+                <input
+                  type="checkbox"
+                  switch
+                  class="haptic-switch"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  [disabled]="store.pending()"
+                  (click)="react(action.kind)"
+                />
+              </div>
+              <span class="action-label" aria-hidden="true">{{ action.label }}</span>
+            </div>
+          }
+        </div>
+      }
+    }
+  </main>
+</div>

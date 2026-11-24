@@ -1,0 +1,243 @@
+import { TestBed } from '@angular/core/testing';
+import { Router, provideRouter } from '@angular/router';
+import { Observable, Subject, of } from 'rxjs';
+import { vi } from 'vitest';
+import { Restaurant } from '../restaurant/restaurant';
+import { SessionReactionsService } from '../session/session-reactions.service';
+import { DECK_SIZE } from './deck-size.token';
+import { DeckSource } from './deck-source';
+import { currentCard, position } from './deck-state';
+import { DeckStore } from './deck.store';
+import { DeckInput } from './deck.types';
+import { RefinementRequest, RefinementService } from './refinement.service';
+
+function restaurants(count: number): Restaurant[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `r${i + 1}`,
+    name: `Restaurant ${i + 1}`,
+    distanceMeters: 100,
+    cuisine: 'Italienne',
+    keywords: [],
+    weeklyHours: [],
+  }));
+}
+
+describe('DeckStore', () => {
+  let store: DeckStore;
+  let session: SessionReactionsService;
+  let navigate: ReturnType<typeof vi.spyOn>;
+  let pending: Subject<readonly Restaurant[]>[];
+  let refine: ReturnType<typeof vi.fn<(r: RefinementRequest) => Observable<readonly Restaurant[]>>>;
+  let all: Restaurant[];
+
+  function setUp(count: number, mode: 'instant' | 'manual' = 'instant'): void {
+    all = restaurants(count);
+    const input: DeckInput = {
+      momentLabel: 'ce soir',
+      targetDateTime: '2026-11-27T20:00',
+      restaurants: all,
+    };
+    pending = [];
+    refine = vi.fn((request: RefinementRequest) => {
+      if (mode === 'instant') {
+        const excluded = new Set(request.excludedIds);
+        return of(all.filter((r) => !excluded.has(r.id)).slice(0, request.slots));
+      }
+      const subject = new Subject<readonly Restaurant[]>();
+      pending.push(subject);
+      return subject.asObservable();
+    });
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        { provide: DeckSource, useValue: { load: () => of(input) } },
+        { provide: RefinementService, useValue: { refine } },
+        { provide: DECK_SIZE, useValue: 3 },
+      ],
+    });
+    store = TestBed.inject(DeckStore);
+    session = TestBed.inject(SessionReactionsService);
+    navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    store.start();
+  }
+
+  const current = () => currentCard(store.state()!)?.id;
+
+  describe('start (US1)', () => {
+    it('builds the deck from the deck source with the configured size', () => {
+      setUp(5);
+
+      expect(store.state()!.size).toBe(3);
+      expect(current()).toBe('r1');
+      expect(store.input()?.momentLabel).toBe('ce soir');
+      expect(session.restaurants()).toEqual(all);
+    });
+
+    it('does not rebuild a deck already started', () => {
+      setUp(5);
+      store.react('liked');
+      store.start();
+
+      expect(current()).toBe('r2');
+    });
+  });
+
+  describe('reactions (US2)', () => {
+    it('records the reaction in the session and shows the next card', () => {
+      setUp(5);
+      store.react('disliked');
+
+      expect(current()).toBe('r2');
+      expect(session.reactions()).toEqual([{ restaurantId: 'r1', kind: 'disliked' }]);
+    });
+
+    it('opens the route screen on a pick (FR-008)', () => {
+      setUp(5);
+      store.react('picked');
+
+      expect(navigate).toHaveBeenCalledWith(['/route', 'r1']);
+      expect(session.reactions()).toEqual([{ restaurantId: 'r1', kind: 'picked' }]);
+    });
+
+    it('goes on at the next card with the pick counted as liked on return (FR-014)', () => {
+      setUp(5);
+      store.react('picked');
+      store.returnFromPick();
+
+      expect(current()).toBe('r2');
+      expect(session.reactions()).toEqual([{ restaurantId: 'r1', kind: 'liked' }]);
+      expect(navigate).toHaveBeenLastCalledWith(['/deck']);
+    });
+
+    it('goes back to the deck when there is no pick to confirm (e.g. after a reload)', () => {
+      setUp(5);
+      store.returnFromPick();
+
+      expect(current()).toBe('r1');
+      expect(navigate).toHaveBeenLastCalledWith(['/deck']);
+    });
+
+    it('treats a deck re-opened after a pick as a return from the route screen', () => {
+      setUp(5);
+      store.react('picked');
+      store.start();
+
+      expect(current()).toBe('r2');
+    });
+  });
+
+  describe('refinement (US3)', () => {
+    it('asks for refinement with all reactions after each reaction (AS1)', () => {
+      setUp(5);
+      store.react('liked');
+      store.react('disliked');
+
+      expect(refine).toHaveBeenLastCalledWith({
+        candidates: all,
+        reactions: [
+          { restaurantId: 'r1', kind: 'liked' },
+          { restaurantId: 'r2', kind: 'disliked' },
+        ],
+        excludedIds: ['r1', 'r2'],
+        slots: 1,
+      });
+    });
+
+    it('shows the next card only once the refinement answered (D2)', () => {
+      setUp(5, 'manual');
+      store.react('liked');
+
+      expect(store.pending()).toBe(true);
+      expect(current()).toBe('r1');
+
+      pending[0].next([all[4], all[3]]);
+
+      expect(store.pending()).toBe(false);
+      expect(current()).toBe('r5');
+      expect(position(store.state()!)).toBe(2);
+    });
+
+    it('ignores reactions while a refinement is pending', () => {
+      setUp(5, 'manual');
+      store.react('liked');
+      store.react('liked');
+
+      expect(refine).toHaveBeenCalledTimes(1);
+    });
+
+    it('goes on with the planned card and flags the failure, then recovers (FR-013)', () => {
+      setUp(5, 'manual');
+      store.react('liked');
+      pending[0].error(new Error('down'));
+
+      expect(current()).toBe('r2');
+      expect(store.state()!.refinementDegraded).toBe(true);
+      expect(store.pending()).toBe(false);
+
+      store.react('liked');
+      pending[1].next([all[4]]);
+
+      expect(store.state()!.refinementDegraded).toBe(false);
+      expect(current()).toBe('r5');
+    });
+
+    it('treats a refinement that completes without result as a failure', () => {
+      setUp(5, 'manual');
+      store.react('liked');
+      pending[0].complete();
+
+      expect(current()).toBe('r2');
+      expect(store.state()!.refinementDegraded).toBe(true);
+    });
+  });
+
+  describe('rewind (US4)', () => {
+    it('shows the previous card, cancels its reaction and refines without it (AS1, AS4)', () => {
+      setUp(5);
+      store.react('liked');
+      store.react('disliked');
+      store.rewind();
+
+      expect(current()).toBe('r2');
+      expect(session.reactions()).toEqual([{ restaurantId: 'r1', kind: 'liked' }]);
+      expect(refine).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          reactions: [{ restaurantId: 'r1', kind: 'liked' }],
+          excludedIds: ['r1', 'r2'],
+          slots: 1,
+        }),
+      );
+    });
+
+    it('does nothing on the first card (AS3)', () => {
+      setUp(5);
+      store.rewind();
+
+      expect(current()).toBe('r1');
+      expect(refine).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('end of deck (US5)', () => {
+    it('opens the results screen after the last card (AS1)', () => {
+      setUp(5);
+      store.react('disliked');
+      store.react('disliked');
+      store.react('disliked');
+
+      expect(store.state()!.status).toBe('finished');
+      expect(navigate).toHaveBeenLastCalledWith(['/results']);
+    });
+
+    it('opens the results screen when returning from a pick on the last card (D12)', () => {
+      setUp(2);
+      store.react('liked');
+      store.react('picked');
+      store.returnFromPick();
+
+      expect(store.state()!.status).toBe('finished');
+      expect(navigate).toHaveBeenLastCalledWith(['/results']);
+      expect(session.reactions()).toContainEqual({ restaurantId: 'r2', kind: 'liked' });
+    });
+  });
+});
