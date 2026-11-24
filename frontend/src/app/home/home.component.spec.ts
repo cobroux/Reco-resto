@@ -1,0 +1,168 @@
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { Subject } from 'rxjs';
+import { vi } from 'vitest';
+import { SearchService } from '../search/search.service';
+import { HomeComponent } from './home.component';
+import { HOME_TEXTS } from './home.texts';
+
+describe('HomeComponent', () => {
+  let fixture: ComponentFixture<HomeComponent>;
+  let root: HTMLElement;
+  let searchEnd: Subject<void>;
+  let searchSpy: ReturnType<typeof vi.fn>;
+
+  const input = () => root.querySelector('input[type="text"]') as HTMLInputElement;
+  const button = () => root.querySelector('button[type="submit"]') as HTMLButtonElement;
+  const form = () => root.querySelector('form') as HTMLFormElement;
+  const alert = () => root.querySelector('[role="alert"]');
+  const status = () => root.querySelector('[role="status"]');
+
+  async function create(): Promise<void> {
+    fixture = TestBed.createComponent(HomeComponent);
+    root = fixture.nativeElement as HTMLElement;
+    await fixture.whenStable();
+  }
+
+  async function type(value: string): Promise<void> {
+    input().value = value;
+    input().dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+  }
+
+  async function clickSubmit(): Promise<void> {
+    button().click();
+    await fixture.whenStable();
+  }
+
+  /** Pressing Enter in a text field of a form makes the browser fire `submit` on the form. */
+  async function pressEnter(): Promise<void> {
+    form().dispatchEvent(new Event('submit', { cancelable: true }));
+    await fixture.whenStable();
+  }
+
+  beforeEach(async () => {
+    searchEnd = new Subject<void>();
+    searchSpy = vi.fn(() => searchEnd.asObservable());
+    await TestBed.configureTestingModule({
+      imports: [HomeComponent],
+      providers: [{ provide: SearchService, useValue: { search: searchSpy } }],
+    }).compileComponents();
+    await create();
+  });
+
+  describe('User Story 1 - start a search (U4, U5, U6, U7)', () => {
+    it('U4: hands the unchanged sentence to the search when "Commencer" is clicked', async () => {
+      await type('  asiatique près d’Opéra  ');
+      await clickSubmit();
+
+      expect(searchSpy).toHaveBeenCalledTimes(1);
+      expect(searchSpy).toHaveBeenCalledWith('  asiatique près d’Opéra  ');
+    });
+
+    it('U4: submits exactly as the button when Enter is pressed', async () => {
+      await type('végétarien à Opéra');
+      await pressEnter();
+
+      expect(searchSpy).toHaveBeenCalledTimes(1);
+      expect(searchSpy).toHaveBeenCalledWith('végétarien à Opéra');
+    });
+
+    it('U7: the field is empty on every opening', async () => {
+      expect(input().value).toBe('');
+      await type('quelque chose');
+
+      await create();
+      expect(input().value).toBe('');
+    });
+
+    it.each([[''], ['   '], ['\t \n']])(
+      'U5: does not submit an empty or space-only sentence (%j) and shows the message',
+      async (sentence) => {
+        await type(sentence);
+        await clickSubmit();
+
+        expect(searchSpy).not.toHaveBeenCalled();
+        expect(alert()?.textContent?.trim()).toBe(HOME_TEXTS.emptyError);
+      },
+    );
+
+    it('U5: hides the empty-search message once the user types', async () => {
+      await clickSubmit();
+      expect(alert()).not.toBeNull();
+
+      await type('a');
+      expect(alert()).toBeNull();
+    });
+
+    it('U6: shows progress, disables the button and ignores a second submission while searching', async () => {
+      await type('asiatique');
+      await clickSubmit();
+
+      expect(status()?.textContent?.trim()).toBe(HOME_TEXTS.searching);
+      expect(button().disabled).toBe(true);
+
+      await pressEnter();
+      expect(searchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('U6: ends the in-progress state when the search ends and keeps the field text', async () => {
+      await type('asiatique');
+      await clickSubmit();
+
+      searchEnd.next();
+      searchEnd.complete();
+      await fixture.whenStable();
+
+      expect(status()).toBeNull();
+      expect(button().disabled).toBe(false);
+      expect(input().value).toBe('asiatique');
+    });
+  });
+
+  describe('User Story 2 - understand Nappe at first glance (U1, U2, U3)', () => {
+    const text = (selector: string) => root.querySelector(selector)?.textContent?.trim();
+    const tiles = () => Array.from(root.querySelectorAll('.tile')) as HTMLElement[];
+
+    it('U1: shows the texts of spec FR-001 word for word', () => {
+      // Literals are copied from the spec on purpose: they guard home.texts.ts against drift (SC-001).
+      expect(text('.logo')).toBe('Nappe');
+      expect(text('.badge')).toBe('Restaurants autour de vous');
+      expect(text('h1')).toBe('Où manger, juste à côté ?');
+      expect(root.querySelectorAll('h1').length).toBe(1);
+      expect(text('.subtitle')).toBe(
+        'Trouvez un restaurant adapté à votre régime et à vos envies, en quelques secondes.',
+      );
+      expect(input().placeholder).toBe('Dites-nous ce qui vous ferait plaisir, et où');
+      expect(button().textContent?.trim()).toBe('Commencer');
+    });
+
+    it('U2: shows the four dietary tiles', () => {
+      expect(tiles().map((tile) => tile.textContent?.trim())).toEqual([
+        'Vegan',
+        'Végétarien',
+        'Sans gluten',
+        'Halal, casher…',
+      ]);
+    });
+
+    it('U2: tiles are decorative: clicking them changes nothing and they are not focusable', async () => {
+      await type('asiatique');
+      for (const tile of tiles()) {
+        tile.click();
+        await fixture.whenStable();
+
+        expect(tile.tagName).not.toBe('BUTTON');
+        expect(tile.hasAttribute('tabindex')).toBe(false);
+      }
+
+      expect(searchSpy).not.toHaveBeenCalled();
+      expect(input().value).toBe('asiatique');
+      expect(alert()).toBeNull();
+      expect(status()).toBeNull();
+    });
+
+    it('U3: shows no "Se connecter" button', () => {
+      expect(root.textContent).not.toContain('Se connecter');
+    });
+  });
+});
