@@ -1,28 +1,49 @@
 # Deployment and CI/CD
 
-## How it works
+## Target
 
-- `.github/workflows/ci.yml` (pull requests): backend tests, frontend tests and build, then a Docker build of both images (no push).
-- `.github/workflows/deploy.yml` (push to `main`): builds both images, pushes them to Amazon ECR (`<account>.dkr.ecr.<region>.amazonaws.com/reco-resto-<app>:<commit sha>`), registers a new ECS task definition revision and deploys it to AWS ECS Fargate (backend, then frontend).
-- Architecture: one Application Load Balancer. `/api/*` goes to the backend (port 8080, health check `/api/hello`), everything else to the frontend (nginx, port 80). One origin, so no CORS.
+One EC2 instance in `eu-west-3`:
 
-## One-time setup
+- Name `reco-restau` (`i-0fbb24dfafd44ad84`), type `t4g.micro` (1 GiB RAM), Amazon Linux 2023, **ARM64 (Graviton)**.
+- Public ports open in its security group: 80, 443 and 22. The backend (port 8080) is not exposed: it must stay reachable only from the frontend (nginx, port 80), which routes `/api/*` to it. One origin, so no CORS.
+- No SSH key pair is attached. The instance profile is `kquach-ec2`.
 
-1. Apply the infrastructure (it creates the ECR repositories; no PAT or registry secret is needed):
+Images must be built for `linux/arm64` to run on this instance.
+
+## CI
+
+`.github/workflows/ci.yml` (pull requests): backend tests, frontend tests and build, then a Docker build of both images (no push).
+
+## CD
+
+`.github/workflows/deploy.yml` (push to `main`):
+
+1. **build**: builds both images for `linux/arm64` and pushes them to GitHub Container Registry (`ghcr.io/<owner>/reco-resto-<app>:<commit sha>` and `:latest`).
+2. **deploy**: copies `docker-compose.yml` to the instance over SSH, runs `docker compose pull` and `up -d` with the commit-SHA tag, then checks `http://<host>/api/hello`.
+
+The frontend container (nginx) is the only one published (port 80) and proxies `/api/` to the backend container (`frontend/nginx.conf`). Files: `docker-compose.yml`, `frontend/nginx.conf`.
+
+### One-time setup
+
+1. **Docker on the instance** (Amazon Linux 2023, ARM64), from an EC2 Instance Connect session:
    ```
-   cd infra
-   terraform init
-   terraform apply -var region=<aws-region>
+   sudo dnf install -y docker
+   sudo systemctl enable --now docker
+   sudo usermod -aG docker ec2-user
+   sudo mkdir -p /usr/local/lib/docker/cli-plugins
+   sudo curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64      -o /usr/local/lib/docker/cli-plugins/docker-compose
+   sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
    ```
-   Add `-var create_github_oidc_provider=false` if the AWS account already has the GitHub OIDC provider.
-2. In GitHub (Settings > Secrets and variables > Actions > Variables), add:
-   - `AWS_REGION`: the region used above;
-   - `AWS_ROLE_ARN`: Terraform output `github_deploy_role_arn`;
-   - `ECS_PROJECT`: `reco-resto` (the Terraform `project` variable; it is the cluster name and the service/task prefix).
-3. First deploy: the ECS services start with the `:latest` image, which does not exist in ECR. They stay unhealthy until the first run of `deploy.yml` on `main` publishes and deploys a real image.
+2. **SSH key for the deploy**: generate a dedicated key pair (`ssh-keygen -t ed25519 -f deploy_key -N ""`), append `deploy_key.pub` to `~/.ssh/authorized_keys` on the instance, then delete the local files after step 3.
+3. **GitHub** (Settings > Secrets and variables > Actions):
+   - secret `EC2_SSH_KEY`: content of the private key `deploy_key`;
+   - secret `EC2_HOST`: public IP or DNS name of the instance;
+   - variable `EC2_USER`: `ec2-user`.
+4. **Images are public**: after the first run of `deploy.yml`, open each package (`reco-resto-backend`, `reco-resto-frontend`) in the GitHub organisation's Packages and set its visibility to public. The instance pulls them without authentication.
 
 ## Known limits
 
-- HTTP only: add a domain and an ACM certificate to serve HTTPS.
-- Default VPC, tasks with a public IP, one task per service: fine for a first deployment, not hardened for production.
-- Terraform state is local; move it to a remote backend (S3) for team use.
+- HTTP only: add a domain and a certificate to serve HTTPS.
+- A single small instance, with no redundancy; its public IP changes on stop/start unless an Elastic IP is attached.
+- The SSH host key is read with `ssh-keyscan` at each run (trust on first use), and port 22 is open to the Internet.
+- The instance is managed by hand: its configuration is not versioned in the repository.
