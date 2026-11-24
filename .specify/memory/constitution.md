@@ -1,50 +1,67 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# Reco-Resto Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Spec-Driven Development
+Every feature MUST go through Spec Kit: `/speckit-specify`, `/speckit-plan`, `/speckit-tasks`,
+then `/speckit-implement`. One feature MUST live in one branch and one `specs/<NNN>-<feature>/`
+folder. The spec and plan MUST be approved by a teammate other than the author before tasks are
+generated, and MUST NOT be edited during implementation; deviations are reported in the PR.
+Rationale: four contributors work in one monorepo and must not edit the same spec.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Test-First
+Tests MUST be written before the code they cover and MUST fail before the implementation makes
+them pass. Backend tests live in `backend/src/test/java`, mirroring the package of the class under
+test. Frontend tests live next to the code as `*.spec.ts`. All tests MUST pass locally before a PR
+is opened.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Never Guess
+When a request is ambiguous or information is missing, contributors and agents MUST ask before
+acting, all open questions in a single batch before any code is written. Business values (rates,
+scales, thresholds, limits, dates), edge-case and error behavior, the location, name or shape of
+what is created, and any change to existing behavior MUST NOT be assumed. A value that could not be
+verified MUST be flagged for validation. Choices that follow an established convention of the code
+base or language are applied without asking and mentioned.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. DRY
+Every piece of knowledge (logic, constant, rule, data table) MUST have a single authoritative
+representation. Before writing code, the code base MUST be searched, by behavior and related
+keywords, for something to reuse or extend. Existing code MUST be extended in place rather than
+duplicated; every caller and test MUST be updated when a signature changes; replaced code MUST be
+removed in the same change. The result MUST report what was reused, extended or replaced.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. English and Conventional Commits
+Code, comments, docs, specs, commit messages and PRs MUST be written in English. Commits MUST follow
+Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`, `refactor:`). Branches MUST be
+named `feat/<slug>`, `fix/<slug>` or `chore/<slug>`.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Technology and Repository Constraints
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+- Backend: Java 21, Spring Boot 4.1.1, Maven, base package `hr.emocio.recoresto`, in `backend/`.
+- Frontend: Angular 22, in `frontend/`.
+- Backend and frontend live in one monorepo.
+- Secrets MUST NOT be committed; local configuration goes in `.env` (ignored) and `.env.example`
+  MUST be kept up to date.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+## Development Workflow and Quality Gates
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+- Nobody commits directly to `main`, and shared branches are never force-pushed.
+- Agents MUST NOT push or open PRs; humans do. Agents commit only when asked.
+- Every PR uses the repository template, includes the spec folder for a feature, and is approved by
+  at least one teammate before merge.
+- Quality gate before a PR: `mvn -f backend test` and `npm --prefix frontend test -- --watch=false`
+  pass.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes other practices in the repository. `CLAUDE.md` is the runtime guidance
+file for agents and MUST stay consistent with it.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+- **Amendments**: proposed by PR that edits this file, approved by at least one teammate other than
+  the author, with the version and the amendment date updated in the same PR.
+- **Versioning**: semantic. MAJOR for a removed or redefined principle, MINOR for a new principle or
+  section or materially expanded guidance, PATCH for wording and clarifications.
+- **Compliance**: every PR review MUST check compliance with the principles above; any deviation
+  MUST be justified in the PR description.
+
+**Version**: 1.0.0 | **Ratified**: TODO(RATIFICATION_DATE): not ratified by the team yet | **Last Amended**: 2026-11-24
