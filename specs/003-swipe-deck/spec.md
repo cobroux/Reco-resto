@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-24
 
-**Status**: Draft
+**Status**: Approved (product owner, 2026-11-24)
 
 **Input**: User description: "Spec 3.1 – Tinder-like front. The search proposes restaurant ideas in a 'Tinder' way. The LLM adapts to the swipes to propose other restaurants and refine the search. As a user, I want my reactions to refine the next cards so that the proposals match my tastes. Swipe left = no, swipe right = yes, swipe up = we take this one. The card shows the distance, today's opening hours, the restaurant name and a few relevant keywords." MVP persona: "Philipe, 38, employee and tourist in Paris, wants to find a restaurant matching his tastes and diet."
 
