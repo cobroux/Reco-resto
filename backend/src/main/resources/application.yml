@@ -7,6 +7,14 @@ llm:
   api-key: ${LLM_API_KEY:}
   model: ${LLM_MODEL:nova-lite}
 
-geocoder:
-  # Base URL of the API Adresse (data.gouv.fr). Not verified against the live service yet.
-  base-url: https://api-adresse.data.gouv.fr
+# Provisional values, NOT validated by the team (plan.md O11). Only max-calls (1) was given by the team.
+# Each one can be overridden by the OVERPASS_* environment variable of the same name.
+overpass:
+  base-url: ${OVERPASS_BASE_URL:https://overpass-api.de/api/interpreter}
+  timeout-seconds: ${OVERPASS_TIMEOUT_SECONDS:120}
+  max-response-bytes: ${OVERPASS_MAX_RESPONSE_BYTES:500000}
+  max-query-chars: ${OVERPASS_MAX_QUERY_CHARS:2000}
+  max-calls: ${OVERPASS_MAX_CALLS:1}
+  fixture-file: ${OVERPASS_FIXTURE_FILE:}
+  # Waits (seconds) before each new attempt after an HTTP 502 "at capacity"; 4 attempts in all. Chosen by the team.
+  retry-delays-seconds: ${OVERPASS_RETRY_DELAYS_SECONDS:5,10,20}

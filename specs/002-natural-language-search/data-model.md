@@ -21,16 +21,20 @@ Derived from the spec (Key Entities, FR-001 to FR-016). Field names are proposal
 | moment | date-time or `now` | Defaults to `now` (FR-007); MUST NOT be in the past. |
 | distanceLimit | distance, optional | Replaces the default radius when present (FR-005). |
 
-Budget and specific dish are never stored (FR-003): they are dropped by the extractor.
+Budget and specific dish are never stored (FR-003): they are dropped when the criteria are built.
+The LLM produces the criteria (and the place coordinates, see research.md R3) in its answer.
 
 The allowed values of `cuisines` and `diets` (closed vocabulary or free text) are NOT defined by the
-spec; NEEDS CLARIFICATION. It depends on the restaurant data source (O1).
+spec; NEEDS CLARIFICATION. It depends on the OSM tags the LLM can query (O13).
 
 ## Restaurant (FR-012; each field when available)
 
 name, location (latitude, longitude), distance from the search place, cuisine type, diets satisfied,
 keywords, price level, weekly opening hours, photo, signature dish, address, phone number, menu
 (dishes with description and price).
+
+Source: OpenStreetMap through Overpass. A field absent from OSM stays absent, never invented; the OSM
+tag behind each field and which fields OSM can provide at all are NOT established (O13).
 
 Validation: a restaurant with no address is excluded from the deck (FR-016); a restaurant closed at the
 targeted moment is excluded (FR-007).
@@ -54,3 +58,15 @@ targeted moment is excluded (FR-007).
 
 `NOT_UNDERSTOOD`, `NO_RESULT`, `OUTSIDE_FRANCE`, `SERVICE_UNAVAILABLE`, plus `PLACE_REQUIRED` when the
 sentence has no place and no position was given (FR-006).
+
+## SearchAnswer (internal, `restaurant/SearchAnswer`)
+
+What the restaurant source gives to `SearchService`: `understood`, `outsideFrance`, `criteria`,
+`centers` (one position per place), `restaurants`. Not part of the HTTP contract.
+
+## Configuration (Overpass, added 2026-11-25)
+
+| Key | Default | Source |
+|-----|---------|--------|
+| overpass.base-url, timeout-seconds, max-response-bytes, max-query-chars, max-calls | in `application.yml`, NOT validated by the team | O11 |
+| overpass.fixture-file | empty | development only (O14) |

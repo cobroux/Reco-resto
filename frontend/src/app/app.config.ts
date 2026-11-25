@@ -1,14 +1,15 @@
+import { provideHttpClient } from '@angular/common/http';
 import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { routes } from './app.routes';
+import { HttpSearchService } from './search/http-search.service';
 import { SearchService } from './search/search.service';
-import { StubSearchService } from './search/stub-search.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
-    // Feature 002 replaces this provider with the real search.
-    { provide: SearchService, useClass: StubSearchService },
+    provideHttpClient(),
+    { provide: SearchService, useClass: HttpSearchService },
   ],
 };

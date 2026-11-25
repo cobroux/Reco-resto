@@ -12,54 +12,59 @@
 - **Rationale**: chosen and provided by the team; OpenAI-compatible, so the client stays small and the
   provider can be swapped by configuration.
 - **Not verified** (no key available to the author): support of JSON mode / structured output / tool
-  calling, latency, rate limits, context length, French quality. Until verified, the extractor asks for
-  JSON in the prompt and validates the reply against the schema in `data-model.md`; an invalid reply is
-  treated as "cannot be understood" (spec, User Story 3, scenario 1). To be checked by the developer (O8).
+  calling (now REQUIRED, see R2), latency, rate limits, context length, French quality. The LLM now also
+  extracts the criteria in the same exchange (`SearchAnswer`); the reply is validated against the schema in
+  `data-model.md`; an invalid reply is "cannot be understood" (spec, User Story 3, scenario 1). To be
+  checked by the developer (O8).
 - **Alternatives considered**: none evaluated; the team supplied this endpoint.
 
 ## R2 - Restaurant data source
 
-- **Decision (2026-11-24, from the team)**: there is no restaurant API; the LLM provides the
-  restaurants. "OpenAlacarte" from the spec is not used.
-- **Design consequence**: a `RestaurantSource` port returns restaurants around a point and radius with
-  the FR-012 fields when available; its only adapter asks the LLM and parses a JSON answer. Every
-  answer is validated against the schema; invalid items are dropped.
-- **Risk R2-a**: a language model without a search tool answers from its training data and may invent
-  restaurants, addresses, phone numbers, menus, prices, opening hours or photo URLs.
-- **Decision (2026-11-24, from the team)**: the LLM MUST have web access. Mechanism chosen: the backend
-  declares a web search tool to the LLM (tool calling) and executes the searches through a web search API.
-- **Consequences**: (1) the endpoint MUST support tool calling; not verified, blocking (O8). (2) A web
-  search provider and its access are needed; NOT chosen (O10). (3) Each search costs several LLM turns
-  plus web calls, which affects SC-001 (threshold deferred). (4) Web results are untrusted text: the
-  prompt MUST treat them as data, and the answer is still validated. (5) Web access reduces but does not
-  remove the risk of wrong or stale data (e.g. outdated opening hours), so the validation below stays.
-- **Web provider (2026-11-24, from the team)**: headless Chrome driven by the backend. The tool
-  executed by the backend opens a search engine and pages in Chrome and returns their text to the LLM.
-- **Consequences of headless Chrome**: (1) a Chrome binary and an automation library must be available
-  where the backend runs, with enough memory; not assessed. (2) Page loads are slow, which weighs on
-  SC-001. (3) Search engines may block or rate-limit automated browsers and may forbid it in their terms
-  of use; engine and terms to be checked by the team (O10). (4) The LLM chooses what to open: the tool
-  MUST limit allowed URLs and schemes (http/https only, no private or local addresses), page count,
-  time and size per search, otherwise the backend can be used to reach internal resources. (5) Page
-  content may contain instructions aimed at the LLM; it MUST be passed as data only. Design points to
-  confirm in the task list, not decided here.
-- **Fallback if tool calling is not supported**: the backend runs the web search itself and injects the
-  results into the prompt; to decide with the team, not assumed.
-- **Mitigations in the design (no external data needed)**: the backend re-checks what it can (address
-  present, distance from the resolved place computed from the API Adresse coordinates of the address,
-  opening hours consistent with the targeted moment) and never invents a missing field.
-- **Alternatives considered**: a real restaurant data source (e.g. OpenAlacarte); rejected by the team.
+- **Decision (2026-11-25, from the team; supersedes the 2026-11-24 "LLM provides restaurants" and
+  "headless Chrome" decisions)**: restaurants come from **Overpass (OpenStreetMap)**. "OpenAlacarte" from
+  the spec is not used.
+- **Mechanism (2026-11-25, from the team)**: the LLM searches by **tool calling**. The backend declares an
+  Overpass tool to the LLM; when the LLM calls it, `OverpassClient` runs the query and the result goes back
+  to the LLM, until it gives its final answer (`SearchAnswer`).
+- **Tool arguments (2026-11-25, from the team)**: the LLM does not write Overpass QL (it forgot the
+  `[out:json]` header and was refused). It sends JSON in the format of the tag filters of the Overpass
+  documentation (criteria/per_tag): `around` (points with radius in meters), `tags` (each `key`+`value` for
+  `key="value"`, or `key`+`regex` for `key~"regex"`, all must match), optional `types`. The backend builds the
+  query (`OverpassQueryBuilder`: `[out:json][timeout:N]`, `out center`), escapes the literals and refuses
+  invalid arguments with a message for the model. Only the two filter forms documented on that page are
+  supported (no key-exists, no `!=`, no case-insensitive flag). Which OSM tags express a cuisine or a diet is
+  left to the model and not verified (O13).
+- **Design consequence**: a `RestaurantSource` port returns restaurants for a search; the adapter drives
+  the LLM tool-calling loop. The backend never trusts the LLM for what it can recompute (radius, distance,
+  opening hours at the moment, address present) and drops invalid items; a missing field stays absent.
+- **Bounds on the tool (code in the working tree, values NOT validated by the team)**: query length,
+  answer size, number of calls per search, HTTP timeout (`overpass.*`). A query refused or an unusable
+  answer is returned to the LLM as a message (`OverpassRefusal`) so it can correct itself; a service
+  failure is `SERVICE_UNAVAILABLE`. The query must contain `[out:json`.
+- **Instances**: public instances refuse anonymous default clients (HTTP 406 seen on 2026-11-25), so the
+  client sends a generic `User-Agent`. A local instance with the Geofabrik France extract is provided in
+  `infra/overpass` (about 5 GB download; disk, memory and build time not measured). Which instance each
+  environment uses, and the usage policy of the public ones: NOT decided (O11).
+- **Development fixture**: `overpass.fixture-file` replaces the network call with a file (same answer for
+  every query, data NOT real). Development only (O14).
+- **Consequences**: (1) the endpoint MUST support tool calling; not verified (O8). (2) Several LLM turns
+  per search weigh on SC-001 (threshold deferred). (3) Overpass results are untrusted text and are passed
+  to the LLM as data only; a query is written by the LLM, so the bounds above are the protection against
+  abuse of the Overpass instance. (4) OSM completeness: fields such as opening hours, diets, phone, photo,
+  menu, signature dish and price level may be missing or absent from OSM altogether; not verified (O13).
+- **Fallback if tool calling is not supported**: to decide with the team, not assumed.
+- **Alternatives considered**: LLM-only data and headless-Chrome web tool (dropped by the team);
+  a real restaurant API (rejected by the team).
 
-## R3 - Place resolution (geocoding)
+## R3 - Place resolution
 
-- **Decision (2026-11-24, from the team)**: API Adresse (data.gouv.fr). Needed to turn "Opéra, Paris"
-  into coordinates, to detect a place outside France (FR-010) and to handle several places (FR-015).
-- **To verify** (not checked by the author): the API covers France only, so a place outside France is
-  expected to give no result; this must be distinguished from a French place that is merely unknown,
-  and from a service failure. Whether it resolves landmark-like places such as "Opéra" or "gare de Lyon"
-  as well as addresses is not verified.
-- **Use for restaurants**: also used to geocode the address of each restaurant returned by the LLM so the
-  radius and distance are computed by the backend rather than trusted from the LLM.
+- **Decision (2026-11-25, from the team)**: the LLM resolves the place (e.g. "Opéra, Paris") and detects a
+  place outside France (FR-010), handles several places (FR-015), and returns the search points
+  (`SearchAnswer.centers`). The API Adresse client, `PlaceResolver` and `ResolvedPlace` are removed.
+- **Risk**: coordinates produced by a language model may be wrong. The validation rule for coordinates
+  and for "in France" is NOT defined here (O12).
+- **Not verified**: how well `nova-lite` locates landmarks such as "Opéra" or "gare de Lyon", and how
+  reliably it flags places outside France.
 
 ## R4 - Opening-hours filtering at a targeted moment
 
@@ -85,6 +90,6 @@
 
 ## R7 - Privacy
 
-- **Decision**: NEEDS CLARIFICATION (O5). Data leaving the backend: the sentence and the place or
-  position (LLM endpoint), place names and restaurant addresses (API Adresse), search queries derived from
-  the sentence (web search provider). The team must validate each third party before release.
+- **Decision**: NEEDS CLARIFICATION (O5). Data leaving the backend: the sentence and the position
+  (LLM endpoint), Overpass queries written by the LLM, which contain coordinates (public Overpass instance,
+  or none if the local instance is used). The team must validate each third party before release.
