@@ -10,8 +10,8 @@ Build the Nappe swipe deck in the Angular frontend: the search results are shown
 
 Decided with the product owner on 2026-11-24:
 
-- **Frontend only, with stubs.** Feature 002 (language model, restaurant source, backend) is not designed yet. 003 defines its own injectable contracts (`DeckSource`, `RefinementService`) with stub implementations that 002 will replace by providing other classes, without touching the deck screen.
-- **Own contract in 003.** 003 is built on `main`, not on `feat/home-search-screen`. The 001 `SearchService` is not reused; both contracts are reconciled when 001 and 003 are merged (see Complexity Tracking).
+- **Frontend only, with stubs.** Feature 002 (language model, restaurant source, backend) is not designed yet. 003 defines its own injectable contract (`RefinementService`) and reads the search result of 001's `SearchService`, with stub implementations that 002 will replace by providing other classes, without touching the deck screen.
+- **Contract reconciled with 001 (2026-11-25).** 003 was first built with its own `DeckSource`. After merging `main` (001), `DeckSource` was removed: 001's `SearchService` now returns the `DeckInput`, kept in `SearchResultStore` and read by the deck (spec FR-019–FR-021).
 - **The next card waits for the refinement result** (US3 AS1); on failure the deck goes on with the planned cards (FR-013).
 - **The refinement stub keeps the initial order.** The refinement call, its failure path (FR-013) and the no-repeat rule (FR-006) are implemented and tested; the "liked cuisine goes up" effect (US3 AS1 effect, SC-004) is verified when 002 provides the real refinement.
 - **Placeholder routes** for 005 (`/results`) and 006 (`/route/:id`), replaced by those features.
@@ -48,7 +48,7 @@ Decided with the product owner on 2026-11-24:
 | I. Spec-Driven Development | Pass | Spec is Draft; spec and plan go to teammate review before `/speckit-tasks`. Nothing is implemented in this step. |
 | II. Test-First | Pass | Tasks will put every `*.spec.ts` (deck state, gesture, services, component) before the code it covers. |
 | III. Never Guess | Pass | Every value not given by the spec or the mockup was decided by the product owner on 2026-11-24 (Decisions D1–D17). Items owned by feature 002 are listed as still open. |
-| IV. DRY | Pass with justified deviation | Repo searched (`main`): nothing to reuse (empty routes, placeholder shell). One deviation: a deck contract separate from 001's `SearchService`, chosen by the product owner, reconciled at merge (Complexity Tracking). Inside 003: one texts file, one deck-size token, one distance formatter, one opening-hours helper. |
+| IV. DRY | Pass with justified deviation | Repo searched (`main`): nothing to reuse (empty routes, placeholder shell). The temporary deck contract separate from 001's `SearchService` was removed at merge: one search contract, one stub. Inside 003: one texts file, one deck-size token, one distance formatter, one opening-hours helper. |
 | V. English and Conventional Commits | Pass | Code and docs in English; only UI texts are French, as the spec requires. |
 
 **Post-design re-check (after Phase 1)**: unchanged. The design adds no backend, no dependency and no duplicated rule beyond the justified deviation.
@@ -191,11 +191,11 @@ Spec overrides applied on top of the mockup:
 1. **SC-001** threshold: set in feature 002's plan.
 2. **SC-004** controlled test set and success threshold: with feature 002's real refinement.
 3. **`targetDateTime`** in `DeckInput`: to be confirmed in feature 002's plan.
-4. **Contract reconciliation** with 001's `SearchService` at merge (Complexity Tracking).
+4. ~~**Contract reconciliation** with 001's `SearchService` at merge~~: done on 2026-11-25 (amendment (b)).
 5. **Constitution ratification date** is still `TODO` (not part of this feature).
 
 ## Complexity Tracking
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| Deck contract (`DeckSource`) separate from 001's `SearchService` (DRY) | Product owner decision: 003 starts from `main` while 001 is not merged | Rebasing on `feat/home-search-screen` couples the two branches before review. Reconciliation task at merge: `SearchService.search()` must produce the `DeckInput` of `DeckSource`, or one of the two is removed. |
+| ~~Deck contract (`DeckSource`) separate from 001's `SearchService` (DRY)~~ resolved 2026-11-25: `DeckSource` removed | Product owner decision: 003 starts from `main` while 001 is not merged | Rebasing on `feat/home-search-screen` couples the two branches before review. Reconciliation task at merge: `SearchService.search()` must produce the `DeckInput` of `DeckSource`, or one of the two is removed. |

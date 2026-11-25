@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-24
 
-**Status**: Approved (product owner, 2026-11-24); amendment of 2026-11-25 (US1 AS6–AS8, FR-015–FR-018: tablecloth under the stack, no card behind, "En cuisine…" crêpe toss) approved (product owner, 2026-11-25)
+**Status**: Approved (product owner, 2026-11-24); amendment of 2026-11-25 (US1 AS6–AS8, FR-015–FR-018: tablecloth under the stack, no card behind, "En cuisine…" crêpe toss) approved (product owner, 2026-11-25); amendment of 2026-11-25 (b) (FR-019–FR-021: opening the deck from the home search) pending approval
 
 **Input**: User description: "Spec 3.1 – Tinder-like front. The search proposes restaurant ideas in a 'Tinder' way. The LLM adapts to the swipes to propose other restaurants and refine the search. As a user, I want my reactions to refine the next cards so that the proposals match my tastes. Swipe left = no, swipe right = yes, swipe up = we take this one. The card shows the distance, today's opening hours, the restaurant name and a few relevant keywords." MVP persona: "Philipe, 38, employee and tourist in Paris, wants to find a restaurant matching his tastes and diet."
 
@@ -129,6 +129,9 @@ When Philipe has reacted to every card, he lands on the results screen.
 - **FR-016**: The next card MUST NOT be shown before the refinement that follows a reaction has answered or failed; no refinement is computed in advance (amended 2026-11-25).
 - **FR-017**: Under the current card, on the tablecloth, the deck MUST show a crêpe tossed from a pan with the text "En cuisine…", visible as soon as the card is moved away and while the next card is prepared; with reduced motion, only the text (amended 2026-11-25).
 - **FR-018**: After a reaction, the next card MUST NOT be shown before one full crêpe toss has played (1 s), even when the refinement answered earlier; no minimum wait with reduced motion (amended 2026-11-25).
+- **FR-019**: When the search started from the home screen (feature 001) succeeds, the system MUST open the deck built from that search's result (amended 2026-11-25 (b)).
+- **FR-020**: A new search from the home screen MUST start a new deck from its own result; the previous deck and its reactions are discarded (amended 2026-11-25 (b)).
+- **FR-021**: Opening the deck when no search was made in the session MUST open the home screen instead (amended 2026-11-25 (b)).
 
 ### Key Entities *(include if feature involves data)*
 
@@ -144,6 +147,18 @@ When Philipe has reacted to every card, he lands on the results screen.
 - **SC-002**: In acceptance testing, 100% of reactions done by gesture and by button are recorded as the expected reaction.
 - **SC-003**: In acceptance testing, 0 restaurant appears twice in the same deck outside rewind.
 - **SC-004**: After liking restaurants of one cuisine, the share of that cuisine in the following cards increases, on a controlled test set defined at planning time.
+
+### Test plan — amendment 2026-11-25 (b)
+
+The Expected column is written by the product owner only.
+
+| Test | Rule | Case | Input | Expected |
+|---|---|---|---|---|
+| T1 | FR-019 | nominal | Home screen, sentence "italien ce soir près d'Opéra", press "Commencer", the search succeeds | On arrive sur deck on voit les cartes en fonction du resultat du llm |
+| T2 | FR-019 | limit: search in progress | Same sentence, before the search has answered | On est sur home screen on voit un chargement |
+| T3 | FR-020 | nominal | Deck at card 3 with 2 reactions, back to home, new sentence, search succeeds | On arrive sur deck on voit le nouveau resultat |
+| T4 | FR-021 | limit: no search | Open `/deck` directly in a new session | On revient sur homescreen |
+| T5 | FR-019 | limit: search fails | Sentence submitted, the search returns an error | On reste sur home screen on voit un message d'erreur |
 
 ## Assumptions
 

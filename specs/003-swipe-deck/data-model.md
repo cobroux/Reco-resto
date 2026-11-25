@@ -20,7 +20,7 @@ Subset of feature 002's Restaurant (002 FR-012) used by the deck. Optional field
 
 `OpeningRange`: `{ open: "HH:mm", close: "HH:mm" }`.
 
-## DeckInput (from `DeckSource`)
+## DeckInput (from `SearchService`, kept in `SearchResultStore`)
 
 | Field | Type | Notes |
 |-------|------|-------|

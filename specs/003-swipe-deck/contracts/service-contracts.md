@@ -2,18 +2,25 @@
 
 Frontend contracts between the deck (003), the search (002) and the next screens (005, 006). Types refer to [data-model.md](../data-model.md). TypeScript signatures are the contract; bodies belong to the implementation.
 
-## DeckSource (provided by 002, stubbed in 003)
+## SearchService and SearchResultStore (search provided by 002, stubbed; reconciled with 001)
 
 ```ts
-export abstract class DeckSource {
-  /** Deck input of the current search. Errors are handled by feature 002's screens, not by the deck. */
-  abstract load(): Observable<DeckInput>;
+export abstract class SearchService {          // app/search/search.service.ts (001 contract, extended)
+  /** Emits the deck input of the search once, then completes; errors when the search fails. */
+  abstract search(sentence: string): Observable<DeckInput>;
+}
+
+@Injectable({ providedIn: 'root' })
+export class SearchResultStore {               // app/search/search-result.store.ts
+  readonly result: Signal<DeckInput | null>;   // null until a search succeeded in the session
+  set(result: DeckInput): void;
 }
 ```
 
+- The home screen (001) calls `SearchService`, stores the result and opens `/deck` (FR-019). The deck reads `SearchResultStore`; it never calls the search.
+- `/deck` is guarded by `searchResultGuard`: no result in the session opens the home screen (FR-021).
 - `restaurants` are ranked, open at the targeted moment, with a known address (002 FR-007, FR-016).
-- Stub: `StubDeckSource` returns the fixed data set of 16 fictional Paris restaurants (D6), `momentLabel: 'ce soir'` and a fixed `targetDateTime`.
-- Reconciliation with 001's `SearchService` at merge: see plan, Complexity Tracking.
+- Stub: `StubSearchService` returns, after 500 ms, the fixed data set of 16 fictional Paris restaurants (D6), `momentLabel: 'ce soir'` and a fixed `targetDateTime`. Feature 002 replaces this single provider.
 
 ## RefinementService (provided by 002, stubbed in 003)
 
@@ -63,7 +70,7 @@ export class SessionReactionsService {
 @Injectable({ providedIn: 'root' })
 export class DeckStore {
   readonly state: Signal<DeckState | null>;
-  start(): void;                       // loads DeckSource, builds the deck
+  start(): void;                       // builds the deck from SearchResultStore; a new result starts a new deck (FR-020)
   react(kind: 'liked' | 'disliked' | 'picked'): void;
   rewind(): void;
   returnFromPick(): void;              // FR-014
