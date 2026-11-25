@@ -1,5 +1,7 @@
 # Reco-Resto
 
+<img src="qrcode.svg" alt="QR code" width="200">
+
 <!-- TODO(team): one-paragraph product description. Not defined yet. -->
 
 Monorepo: `backend/` (Spring Boot) and `frontend/` (Angular). Work follows Spec-Driven Development with Spec Kit; see `specs/README.md` and `CONTRIBUTING.md`.
