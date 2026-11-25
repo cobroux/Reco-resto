@@ -1,6 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { Router, provideRouter } from '@angular/router';
 import { Subject } from 'rxjs';
 import { vi } from 'vitest';
+import { DeckInput } from '../deck/deck.types';
+import { STUB_DECK_INPUT } from '../deck/stub/stub-restaurants';
+import { SearchResultStore } from '../search/search-result.store';
 import { SearchService } from '../search/search.service';
 import { HomeComponent } from './home.component';
 import { HOME_TEXTS } from './home.texts';
@@ -8,8 +12,9 @@ import { HOME_TEXTS } from './home.texts';
 describe('HomeComponent', () => {
   let fixture: ComponentFixture<HomeComponent>;
   let root: HTMLElement;
-  let searchEnd: Subject<void>;
+  let searchEnd: Subject<DeckInput>;
   let searchSpy: ReturnType<typeof vi.fn>;
+  let navigate: ReturnType<typeof vi.spyOn>;
 
   const input = () => root.querySelector('input[type="text"]') as HTMLInputElement;
   const button = () => root.querySelector('button[type="submit"]') as HTMLButtonElement;
@@ -41,12 +46,13 @@ describe('HomeComponent', () => {
   }
 
   beforeEach(async () => {
-    searchEnd = new Subject<void>();
+    searchEnd = new Subject<DeckInput>();
     searchSpy = vi.fn(() => searchEnd.asObservable());
     await TestBed.configureTestingModule({
       imports: [HomeComponent],
-      providers: [{ provide: SearchService, useValue: { search: searchSpy } }],
+      providers: [provideRouter([]), { provide: SearchService, useValue: { search: searchSpy } }],
     }).compileComponents();
+    navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     await create();
   });
 
@@ -109,13 +115,60 @@ describe('HomeComponent', () => {
       await type('asiatique');
       await clickSubmit();
 
-      searchEnd.next();
+      searchEnd.next(STUB_DECK_INPUT);
       searchEnd.complete();
       await fixture.whenStable();
 
       expect(status()).toBeNull();
       expect(button().disabled).toBe(false);
       expect(input().value).toBe('asiatique');
+    });
+  });
+
+  describe('Opening the deck (spec 003 FR-019, FR-020)', () => {
+    it('T1: keeps the search result and opens the deck when the search succeeds', async () => {
+      await type("italien ce soir près d'Opéra");
+      await clickSubmit();
+
+      searchEnd.next(STUB_DECK_INPUT);
+      searchEnd.complete();
+      await fixture.whenStable();
+
+      expect(TestBed.inject(SearchResultStore).result()).toBe(STUB_DECK_INPUT);
+      expect(navigate).toHaveBeenCalledWith(['/deck']);
+    });
+
+    it('T2: stays on the home screen with the in-progress indication before the search answers', async () => {
+      await type("italien ce soir près d'Opéra");
+      await clickSubmit();
+
+      expect(navigate).not.toHaveBeenCalled();
+      expect(TestBed.inject(SearchResultStore).result()).toBeNull();
+      expect(status()?.textContent?.trim()).toBe(HOME_TEXTS.searching);
+      expect(button().disabled).toBe(true);
+    });
+
+    it('T5: stays on the home screen and shows an error message when the search fails', async () => {
+      await type("italien ce soir près d'Opéra");
+      await clickSubmit();
+
+      searchEnd.error(new Error('unavailable'));
+      await fixture.whenStable();
+
+      expect(navigate).not.toHaveBeenCalled();
+      expect(alert()?.textContent?.trim()).toBe(HOME_TEXTS.searchError);
+      expect(status()).toBeNull();
+      expect(button().disabled).toBe(false);
+    });
+
+    it('T5: hides the search error message once the user types', async () => {
+      await type('italien');
+      await clickSubmit();
+      searchEnd.error(new Error('unavailable'));
+      await fixture.whenStable();
+
+      await type('italien ce soir');
+      expect(alert()).toBeNull();
     });
   });
 

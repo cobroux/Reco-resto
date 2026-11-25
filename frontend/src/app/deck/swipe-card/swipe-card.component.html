@@ -1,0 +1,63 @@
+<article
+  class="card"
+  [class.dragging]="transform() !== '' && !isLeaving()"
+  [class.leaving]="isLeaving()"
+  [style.transform]="transform()"
+  [style.transition]="transition()"
+  [attr.aria-label]="restaurant().name"
+  (pointerdown)="onPointerDown($event)"
+  (pointermove)="onPointerMove($event)"
+  (pointerup)="onPointerUp()"
+  (pointercancel)="onPointerUp()"
+>
+  <div class="hero">
+    @if (restaurant().photoUrl; as photo) {
+      <img class="photo" [src]="photo" alt="" draggable="false" />
+    } @else {
+      <div class="tablecloth" data-testid="tablecloth" aria-hidden="true"></div>
+    }
+    <span class="distance">{{ distance() }}</span>
+    <div class="stamp like" aria-hidden="true" [style.opacity]="likeOpacity()">
+      <span class="stamp-label"><span class="stamp-icon">♥</span>{{ texts.like }}</span>
+    </div>
+    <div class="stamp nope" aria-hidden="true" [style.opacity]="nopeOpacity()">
+      <span class="stamp-label"><span class="stamp-icon">✕</span>{{ texts.dislike }}</span>
+    </div>
+  </div>
+
+  <div class="body">
+    <h2 class="name">{{ restaurant().name }}</h2>
+    <ul class="chips">
+      <li class="chip cuisine">{{ restaurant().cuisine }}</li>
+      @for (keyword of restaurant().keywords; track keyword) {
+        <li class="chip keyword">{{ keyword }}</li>
+      }
+      @if (restaurant().priceLevel; as price) {
+        <li class="chip price">{{ price }}</li>
+      }
+    </ul>
+    <div class="tiles">
+      <p class="tile open">
+        @if (closingTime(); as time) {
+          {{ texts.openUntil(time) }}
+        }
+      </p>
+      <p class="tile taste">
+        <span class="tile-label">{{ texts.toTaste }}</span>
+        @if (restaurant().dish; as dish) {
+          <span class="dish-name">{{ dish.name }}</span>
+        } @else {
+          <svg
+            data-testid="default-dish"
+            class="default-dish"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="7" />
+            <circle cx="12" cy="12" r="4" />
+          </svg>
+        }
+      </p>
+    </div>
+  </div>
+</article>

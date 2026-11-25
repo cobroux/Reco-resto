@@ -1,6 +1,8 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { catchError, from, Observable, switchMap, throwError } from 'rxjs';
+import { catchError, from, map, Observable, switchMap, throwError } from 'rxjs';
+import { DeckInput } from '../deck/deck.types';
+import { toDeckInput } from './deck-input';
 import { Position, SearchErrorCode, SearchFailure, SearchResult } from './search-result';
 import { SearchService } from './search.service';
 
@@ -41,17 +43,18 @@ function failureOf(error: unknown): SearchFailure {
 
 /**
  * Real search (feature 002): sends the sentence, unchanged, and the device position when granted to
- * `POST /api/search`.
+ * `POST /api/search`, and hands the result to the swipe deck as a `DeckInput` (feature 003).
  */
 @Injectable()
 export class HttpSearchService extends SearchService {
   private readonly http = inject(HttpClient);
 
-  search(sentence: string): Observable<SearchResult> {
+  search(sentence: string): Observable<DeckInput> {
     return from(currentPosition()).pipe(
       switchMap((position) =>
         this.http.post<SearchResult>('/api/search', position ? { sentence, position } : { sentence }),
       ),
+      map((result) => toDeckInput(result)),
       catchError((error: unknown) => throwError(() => failureOf(error))),
     );
   }

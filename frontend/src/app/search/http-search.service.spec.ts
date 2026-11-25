@@ -6,6 +6,7 @@ import { HttpSearchService } from './http-search.service';
 import { SearchFailure } from './search-result';
 
 const SENTENCE = 'asiatique végétarien près d’Opéra';
+const EMPTY_RESULT = { criteria: { cuisines: [], diets: [], places: [] }, deck: [] };
 
 describe('HttpSearchService', () => {
   let service: HttpSearchService;
@@ -40,7 +41,7 @@ describe('HttpSearchService', () => {
       sentence: SENTENCE,
       position: { latitude: 48.85, longitude: 2.35 },
     });
-    request.flush({});
+    request.flush(EMPTY_RESULT);
   });
 
   it('searches without position when it is refused', async () => {
@@ -52,7 +53,7 @@ describe('HttpSearchService', () => {
 
     const request = await vi.waitFor(() => http.expectOne('/api/search'));
     expect(request.request.body).toEqual({ sentence: SENTENCE });
-    request.flush({});
+    request.flush(EMPTY_RESULT);
   });
 
   it('searches without position when geolocation does not exist', async () => {
@@ -62,14 +63,17 @@ describe('HttpSearchService', () => {
 
     const request = await vi.waitFor(() => http.expectOne('/api/search'));
     expect(request.request.body).toEqual({ sentence: SENTENCE });
-    request.flush({});
+    request.flush(EMPTY_RESULT);
   });
 
   it('emits the result once and completes when the answer arrives', async () => {
     vi.stubGlobal('navigator', {});
     const next = vi.fn();
     const complete = vi.fn();
-    const result = { criteria: { cuisines: [], diets: [], places: [] }, deck: [{ name: 'Thai Garden' }] };
+    const result = {
+      criteria: { cuisines: [], diets: [], places: [], moment: '2026-11-28T12:00' },
+      deck: [{ name: 'Thai Garden', address: '3 rue X', distanceMeters: 200, cuisine: 'thai' }],
+    };
 
     service.search(SENTENCE).subscribe({ next, complete });
 
@@ -77,7 +81,14 @@ describe('HttpSearchService', () => {
     expect(complete).not.toHaveBeenCalled();
     request.flush(result);
     expect(next).toHaveBeenCalledTimes(1);
-    expect(next).toHaveBeenCalledWith(result);
+    // the swipe deck (feature 003) gets the result as a deck input
+    expect(next).toHaveBeenCalledWith({
+      momentLabel: null,
+      targetDateTime: '2026-11-28T12:00:00+01:00',
+      restaurants: [
+        expect.objectContaining({ id: 'Thai Garden|3 rue X', name: 'Thai Garden', distanceMeters: 200 }),
+      ],
+    });
     expect(complete).toHaveBeenCalledTimes(1);
   });
 
