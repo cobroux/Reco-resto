@@ -4,6 +4,8 @@ services:
   backend:
     image: ${IMAGE_PREFIX}-backend:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    # ~/.env is written by the deploy workflow from GitHub secrets/variables.
+    env_file: .env
     environment:
       # The instance has 1 GiB of RAM: cap the JVM heap.
       JAVA_TOOL_OPTIONS: -Xmx384m

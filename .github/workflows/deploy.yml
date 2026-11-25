@@ -59,6 +59,16 @@ jobs:
       - name: Copy the compose file
         run: scp docker-compose.yml "${{ vars.EC2_USER }}@${{ secrets.EC2_HOST }}:~/docker-compose.yml"
 
+      - name: Write the .env file
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+        run: |
+          printf 'LLM_BASE_URL=%s\nLLM_API_KEY=%s\nLLM_MODEL=%s\n' \
+            "$LLM_BASE_URL" "$LLM_API_KEY" "$LLM_MODEL" \
+            | ssh "${{ vars.EC2_USER }}@${{ secrets.EC2_HOST }}" 'umask 077 && cat > ~/.env'
+
       - name: Pull and restart the containers
         run: |
           ssh "${{ vars.EC2_USER }}@${{ secrets.EC2_HOST }}" \
