@@ -56,8 +56,8 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Copy the compose and Caddy files
-        run: scp docker-compose.yml Caddyfile "${{ vars.EC2_USER }}@${{ secrets.EC2_HOST }}:~/"
+      - name: Copy the compose file
+        run: scp docker-compose.yml "${{ vars.EC2_USER }}@${{ secrets.EC2_HOST }}:~/docker-compose.yml"
 
       - name: Pull and restart the containers
         run: |
@@ -67,10 +67,8 @@ jobs:
 
       - name: Smoke test
         run: |
-          # Single source of the domain name: the Caddyfile site address.
-          DOMAIN=$(grep -m1 ' {$' Caddyfile | cut -d' ' -f1)
           for i in $(seq 1 12); do
-            curl -fsS "https://$DOMAIN/api/hello" && exit 0
+            curl -fsS "http://${{ secrets.EC2_HOST }}/api/hello" && exit 0
             sleep 10
           done
           exit 1

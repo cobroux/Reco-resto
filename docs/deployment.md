@@ -19,11 +19,9 @@ Images must be built for `linux/arm64` to run on this instance.
 `.github/workflows/deploy.yml` (push to `main`):
 
 1. **build**: builds both images for `linux/arm64` and pushes them to GitHub Container Registry (`ghcr.io/<owner>/reco-resto-<app>:<commit sha>` and `:latest`).
-2. **deploy**: copies `docker-compose.yml` and `Caddyfile` to the instance over SSH, runs `docker compose pull` and `up -d` with the commit-SHA tag, then checks `https://<domain>/api/hello`.
+2. **deploy**: copies `docker-compose.yml` to the instance over SSH, runs `docker compose pull` and `up -d` with the commit-SHA tag, then checks `http://<host>/api/hello`.
 
-Only the Caddy container is published (ports 80 and 443). It serves HTTPS with a Let's Encrypt certificate that it obtains and renews by itself, and forwards to the frontend container (nginx), which proxies `/api/` to the backend container (`frontend/nginx.conf`). Files: `docker-compose.yml`, `Caddyfile`, `frontend/nginx.conf`.
-
-The domain name is set in `Caddyfile` only (currently the public DNS name of the instance). It must resolve to the instance, and ports 80 and 443 must be open to the Internet. If the instance public IP changes (stop/start without an Elastic IP), the name changes too: update `Caddyfile`, or attach an Elastic IP.
+The frontend container (nginx) is the only one published (port 80) and proxies `/api/` to the backend container (`frontend/nginx.conf`). Files: `docker-compose.yml`, `frontend/nginx.conf`.
 
 ### One-time setup
 
@@ -45,7 +43,7 @@ The domain name is set in `Caddyfile` only (currently the public DNS name of the
 
 ## Known limits
 
-- Let's Encrypt limits failed validations (about 5 per hour per name): do not redeploy in a loop if the certificate is not issued. Logs: `docker logs <caddy container>`.
+- HTTP only: add a domain and a certificate to serve HTTPS.
 - A single small instance, with no redundancy; its public IP changes on stop/start unless an Elastic IP is attached.
 - The SSH host key is read with `ssh-keyscan` at each run (trust on first use), and port 22 is open to the Internet.
 - The instance is managed by hand: its configuration is not versioned in the repository.

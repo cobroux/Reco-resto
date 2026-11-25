@@ -14,19 +14,5 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-    # No published port: only Caddy reaches the frontend.
-
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    depends_on:
-      - frontend
     ports:
       - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data # keeps the certificates across restarts
-
-volumes:
-  caddy_data:
