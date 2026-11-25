@@ -1,16 +1,1 @@
-<main>
-  <h1>Reco-Resto</h1>
-  <p>Backend check: <code>GET /api/hello</code></p>
-
-  @if (message(); as text) {
-    <p class="ok" data-testid="hello-message">{{ text }}</p>
-  } @else if (failed()) {
-    <p class="ko" data-testid="hello-error">
-      Backend unreachable. Is it running on http://localhost:8080?
-    </p>
-  } @else {
-    <p>Loading…</p>
-  }
-</main>
-
 <router-outlet />
