@@ -125,6 +125,10 @@ frontend/src/
 | FR-012 no side panel | `deck.component` (not built; asserted in test) |
 | FR-013 refinement failure | `deck.store.ts`, failing stub in tests |
 | FR-014 return from route | `deck-state.ts` (picked → liked), route placeholder |
+| FR-015 tablecloth under the stack, no card behind | `deck.component` (`.table`) |
+| FR-017 "En cuisine…" crêpe toss | `cooking-scene.component`, `deck.texts.ts` |
+| FR-018 one full toss before the next card | `COOKING_TOSS_MS` token, `deck.store.ts` |
+| FR-016 no refinement in advance | `deck.store.ts` (unchanged, D2) |
 
 ## Design Mapping (mockup to implementation)
 
@@ -136,11 +140,11 @@ Values read from `V2WebSwipe.dc.html` and `V2MobileSwipe.dc.html`.
 | Column | max width 420 px, centred | full width, padding 16/20 px |
 | Title | 36 px bold, line-height 1.1 | 28 px |
 | Progress | "X sur N" 15 px `#6A6578` + thin bar (`#5B4BC4` done, `#E4E0F2` to come; mockup dot colours) (D11) | same, plus "Voir la liste" pill at the right (D10) |
-| Card | 560 px high, radius 32 px, white, shadow `0 24px 60px rgba(76,60,160,.16)`; next card peeking behind (rotate 3°, scale .95) | 572 px high |
+| Card | 560 px high, radius 32 px, white, shadow `0 24px 60px rgba(76,60,160,.16)`; no card peeking behind (D20); the next card rises from a smaller, rotated position (rotate 3°, scale .95) | fills the height left by the progress, title and buttons so they show without scrolling (min 340 px, then the page scrolls); the photo absorbs the difference (min 120 px) |
 | Hero | 300 px, distance pill bottom-left | 384 px |
 | Body | name 26 px bold; chips 28 px (cuisine coloured, keywords `#E3F5E1`/`#2F7A3A`, price `#F5F3FC`); two tiles "Ouvert" (`#E3F5E1`) and "À goûter" (`#FDEBDD`/`#A24E12`) | name 22 px |
 | Buttons | 64 px white round, centre 84 px `#5B4BC4` | same |
-| Drag | card follows pointer, rotation dx/18°, stamps "Miam"/"Pas envie" fade in, threshold 110 px, drag starts after 6 px | same |
+| Drag | card follows pointer, rotation dx/18°, stamps "Miam"/"Pas miam" fade in, threshold 110 px, drag starts after 6 px; the stamp differs from the mockup for visibility (2026-11-25): the photo is tinted (violet / raspberry) and a large tilted stamp "♥ MIAM" / "✕ PAS MIAM" sits in its centre | same, stamp text 32 px |
 
 Spec overrides applied on top of the mockup:
 
@@ -162,7 +166,7 @@ Spec overrides applied on top of the mockup:
 | D1 | SC-001 threshold | Deferred to feature 002; not testable until then |
 | D2 | Refinement timing | The next card is shown once the refinement result arrives (US3 AS1); no timeout until SC-001 is set; on error the next planned card is shown with the FR-013 message |
 | D3 | "<" placement | Top-left, where the mockup's arrow is; no home link on the deck |
-| D4 | Button labels (visible and accessible) | "✕" = "Pas envie", "♥" = "Miam", "→" = "On y va", "<" = "Revenir à la carte précédente" |
+| D4 | Button labels (visible and accessible) | "✕" = "Pas miam", "♥" = "Miam", "→" = "On y va", "<" = "Revenir à la carte précédente" |
 | D5 | Gesture thresholds and breakpoint | Horizontal 110 px and drag start 6 px (mockup); up-swipe 110 px with vertical movement dominant; mobile layout below 768 px |
 | D6 | Stub data set | 16 fictional Paris restaurants (the 15 cap is visible), mixed cuisines, at least one without photo and one without dish |
 | D7 | Rewound-past cards | Eligible again: only restaurants with an active reaction are excluded from the following cards |
@@ -177,7 +181,10 @@ Spec overrides applied on top of the mockup:
 | D16 | Default visuals | CSS placeholders until designed: gingham pattern from the Nappe logo for a missing photo; neutral inline-SVG dish icon for a missing dish |
 | D17 | Deck size | Frontend `DECK_SIZE` token (15) until 002 owns the value; then the token is removed |
 | D18 | Swipe animation (added after the first manual test) | The released card flies off in the swipe direction (left, right, up) with rotation and fade; the next card rises from the peek position. Same animation for the "✕", "♥", "→" buttons. Duration 300 ms; none when the user prefers reduced motion. The reaction is applied once the animation ends |
-| D19 | Haptic feedback (added after the first manual test) | On each validated reaction (swipe or button): 15 ms vibration for "Pas envie" and "Miam", two 15 ms pulses 60 ms apart for "On y va". Web Vibration API on Android. iPhone (no Vibration API): unofficial workaround chosen by the product owner on 2026-11-24 — a transparent native switch (`<input type="checkbox" switch>`, hidden from assistive technologies) covers each "✕", "♥", "→" button; the finger's tap on it plays one system tick and triggers the reaction. Verified on iOS 18.7: a real tap ticks, a programmatic toggle does not. Consequences: one tick for every reaction, may stop working with an iOS update. On iPhone the tick is on the buttons only: a switch over the card was tried on 2026-11-24 and removed (no tick on swipes on iOS 18.7, and a plain tap on the card ticked without any reaction). Known limitation, confirmed by research on 2026-11-24: no documented way to get a tick during or after a swipe in iPhone Safari; WebKit does not implement the Vibration API ([W3C report](https://w3c.github.io/vibration/reports/implementation.html)), the switch trick needs a real tap ([Flarum #4694](https://github.com/flarum/framework/issues/4694), [card-credits #4](https://github.com/Jon1095/card-credits/pull/4)); the proposed [Web Haptics API](https://github.com/WICG/web-haptics) ships in no stable browser yet. Revisit if Safari ships it |
+| D19 | Haptic feedback (added after the first manual test) | On each validated reaction (swipe or button): 15 ms vibration for "Pas miam" and "Miam", two 15 ms pulses 60 ms apart for "On y va". Web Vibration API on Android. iPhone (no Vibration API): unofficial workaround chosen by the product owner on 2026-11-24 — a transparent native switch (`<input type="checkbox" switch>`, hidden from assistive technologies) covers each "✕", "♥", "→" button; the finger's tap on it plays one system tick and triggers the reaction. Verified on iOS 18.7: a real tap ticks, a programmatic toggle does not. Consequences: one tick for every reaction, may stop working with an iOS update. On iPhone the tick is on the buttons only: a switch over the card was tried on 2026-11-24 and removed (no tick on swipes on iOS 18.7, and a plain tap on the card ticked without any reaction). Known limitation, confirmed by research on 2026-11-24: no documented way to get a tick during or after a swipe in iPhone Safari; WebKit does not implement the Vibration API ([W3C report](https://w3c.github.io/vibration/reports/implementation.html)), the switch trick needs a real tap ([Flarum #4694](https://github.com/flarum/framework/issues/4694), [card-credits #4](https://github.com/Jon1095/card-credits/pull/4)); the proposed [Web Haptics API](https://github.com/WICG/web-haptics) ships in no stable browser yet. Revisit if Safari ships it |
+| D20 | Tablecloth under the stack (amendment of 2026-11-25) | The white card peeking behind the current card is removed (a card back "En cuisine…" was tried, then dropped by the product owner: the tablecloth alone fills the gap). The stack area shows the lavender gingham of the Nappe logo at low opacity (0.10, to validate on device), with rounded corners, starting below the title. No mask-image (it made the drag stutter on phone); the table is kept on its own compositing layer. The gingham is defined once as the `--nappe-gingham` custom property on the deck host and reused by the logo, the missing-photo visual (D16) and the table. No refinement in advance: D2 is kept (product owner, 2026-11-25) |
+| D21 | "En cuisine…" crêpe toss (amendment of 2026-11-25) | Inline SVG pan (dark body, wooden handle) and SVG crêpe (golden, browned spots, resting inside the pan, slight squash on landing), with three wavy lavender steam wisps and a static shadow, centred on the tablecloth, under the current card (hidden by it at rest, revealed as soon as it moves). Loop of 1 s: the pan flicks, the crêpe rises about 90 px, flips (rotateX 180°) and lands. Only `transform` is animated (compositor only, no repaint of the tablecloth). After a reaction, the store waits for both the refinement and one toss (`COOKING_TOSS_MS`, 1000 ms, 0 with reduced motion) before showing the next card; rewind is not delayed. Reduced motion: pan and crêpe hidden, text only. Duration chosen by Claude, validated by the product owner on 2026-11-25 |
+| D22 | Browser icon (2026-11-25) | The Angular default `favicon.ico` is replaced by the Nappe logo: `public/favicon.svg` (lavender gingham, same pattern as the header logo) and a 180 px square `public/apple-touch-icon.png` for iOS. Product owner chose to do it in this branch: `index.html` now differs from 001's (exception to D9); whoever merges second keeps these two icon links |
 
 ### Still open (outside 003's scope)
 

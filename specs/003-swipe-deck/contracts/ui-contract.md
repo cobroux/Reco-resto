@@ -19,7 +19,7 @@ Routes, screen content, controls and texts. French texts are word for word. Valu
 | "Voir la liste" | Opens `/results` at any time; desktop in the header; mobile: pill at the right of the progress row | FR-009, D10 |
 | "<" | Top-left; label "Revenir à la carte précédente"; rewind; disabled on the first card; no home link | FR-007, US4 AS3, D3, D4 |
 | Card front | photo or tablecloth visual; distance; name; cuisine + keywords chips; price level; "Ouvert jusqu'à HH:MM"; "À goûter" + dish name, or default dish visual without name | US1 AS2–AS4 |
-| "✕" | Label "Pas envie"; dislike | FR-004, D4 |
+| "✕" | Label "Pas miam"; dislike | FR-004, D4 |
 | "♥" | Label "Miam"; like | FR-004, D4 |
 | "→" | Label "On y va"; pick | FR-004, D4 |
 | Degraded message | "Suggestions non personnalisées pour le moment", discreet, non-blocking | FR-013 |

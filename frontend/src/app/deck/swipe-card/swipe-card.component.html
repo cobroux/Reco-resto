@@ -17,12 +17,12 @@
       <div class="tablecloth" data-testid="tablecloth" aria-hidden="true"></div>
     }
     <span class="distance">{{ distance() }}</span>
-    <span class="stamp like" aria-hidden="true" [style.opacity]="likeOpacity()">{{
-      texts.like
-    }}</span>
-    <span class="stamp nope" aria-hidden="true" [style.opacity]="nopeOpacity()">{{
-      texts.dislike
-    }}</span>
+    <div class="stamp like" aria-hidden="true" [style.opacity]="likeOpacity()">
+      <span class="stamp-label"><span class="stamp-icon">♥</span>{{ texts.like }}</span>
+    </div>
+    <div class="stamp nope" aria-hidden="true" [style.opacity]="nopeOpacity()">
+      <span class="stamp-label"><span class="stamp-icon">✕</span>{{ texts.dislike }}</span>
+    </div>
   </div>
 
   <div class="body">

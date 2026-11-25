@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { canRewind, currentCard, position } from './deck-state';
+import { CookingSceneComponent } from './cooking-scene/cooking-scene.component';
 import { DeckStore } from './deck.store';
 import { DECK_TEXTS } from './deck.texts';
 import { ReactionKind } from './deck.types';
@@ -32,7 +33,7 @@ const SWIPE_BY_REACTION: Record<ReactionKind, Direction> = {
 /** Swipe deck screen (feature 003). */
 @Component({
   selector: 'app-deck',
-  imports: [SwipeCardComponent],
+  imports: [SwipeCardComponent, CookingSceneComponent],
   templateUrl: './deck.component.html',
   styleUrl: './deck.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -62,7 +63,6 @@ export class DeckComponent implements OnInit {
   private readonly cardComponent = viewChild(SwipeCardComponent);
   protected readonly position = computed(() => (this.state() ? position(this.state()!) : 0));
   protected readonly size = computed(() => this.state()?.size ?? 0);
-  protected readonly hasNext = computed(() => (this.state()?.planned.length ?? 0) > 0);
   protected readonly canRewind = computed(() => {
     const state = this.state();
     return !!state && canRewind(state) && !this.store.pending();

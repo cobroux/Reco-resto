@@ -39,7 +39,7 @@
 - [x] T008 [P] Create abstract `DeckSource` in `app/deck/deck-source.ts` per contracts/service-contracts.md.
 - [x] T009 [P] Create `RefinementRequest` and abstract `RefinementService` in `app/deck/refinement.service.ts` per contracts/service-contracts.md.
 - [x] T010 [P] Create `DECK_SIZE` injection token (default 15, D17) in `app/deck/deck-size.token.ts`.
-- [x] T011 [P] Create `app/deck/deck.texts.ts`, single source of every French text of the deck and placeholders: title pattern "Ça vous dit, {moment} ?", default moment "maintenant", "{position} sur {size}", "Voir la liste", "Pas envie", "Miam", "On y va", "Revenir à la carte précédente" (D4), "À goûter", "Ouvert jusqu'à {time}", "Suggestions non personnalisées pour le moment" (FR-013), "Résultats — bientôt disponible", "Retour aux propositions" (D13).
+- [x] T011 [P] Create `app/deck/deck.texts.ts`, single source of every French text of the deck and placeholders: title pattern "Ça vous dit, {moment} ?", default moment "maintenant", "{position} sur {size}", "Voir la liste", "Pas miam", "Miam", "On y va", "Revenir à la carte précédente" (D4), "À goûter", "Ouvert jusqu'à {time}", "Suggestions non personnalisées pour le moment" (FR-013), "Résultats — bientôt disponible", "Retour aux propositions" (D13).
 - [x] T012 [P] Write `app/deck/stub/stub-restaurants.spec.ts`: data set has 16 restaurants (D6), unique ids, at least 3 cuisines, at least one without `photoUrl`, at least one without `dish`, every restaurant open at the stub `targetDateTime`.
 - [x] T013 Create `app/deck/stub/stub-restaurants.ts`: 16 fictional Paris restaurants and the stub `targetDateTime` / `momentLabel: 'ce soir'` (D6); T012 passes.
 - [x] T014 [P] Write `app/deck/stub/stub-deck-source.spec.ts`: `load()` emits the stub `DeckInput`.
@@ -93,8 +93,8 @@
 - [x] T033 [P] [US2] Write `app/deck/swipe-card/swipe-gesture.spec.ts` (D5): under 6 px → no drag; dx ≥ 110 → right; dx ≤ −110 → left; dy ≤ −110 with |dy| > |dx| → up; under thresholds → none; diagonal cases.
 - [x] T034 [P] [US2] Extend `app/deck/deck-state.spec.ts` — `react(liked|disliked)` records `Reaction.kind` and moves to the next card; `react(picked)` sets status `picked`; `returnFromPick` turns `picked` into `liked` and moves to the next card (FR-014).
 - [x] T035 [P] [US2] Extend `app/deck/deck.store.spec.ts` — `react` updates `SessionReactionsService` (FR-011); pick navigates to `/route/:id` (FR-008) (Router spy).
-- [x] T036 [P] [US2] Extend `app/deck/deck.component.spec.ts` — buttons "✕"/"♥"/"→" with accessible names "Pas envie"/"Miam"/"On y va" call the right reaction (D4); "Voir la liste" navigates to `/results` (FR-009).
-- [x] T037 [P] [US2] Extend `app/deck/swipe-card/swipe-card.component.spec.ts` — pointer drag beyond threshold emits the reaction; release under threshold returns the card; "Miam"/"Pas envie" stamps follow the drag (mockup). If jsdom lacks `PointerEvent`, use the research.md fallback.
+- [x] T036 [P] [US2] Extend `app/deck/deck.component.spec.ts` — buttons "✕"/"♥"/"→" with accessible names "Pas miam"/"Miam"/"On y va" call the right reaction (D4); "Voir la liste" navigates to `/results` (FR-009).
+- [x] T037 [P] [US2] Extend `app/deck/swipe-card/swipe-card.component.spec.ts` — pointer drag beyond threshold emits the reaction; release under threshold returns the card; "Miam"/"Pas miam" stamps follow the drag (mockup). If jsdom lacks `PointerEvent`, use the research.md fallback.
 - [x] T038 [P] [US2] Write `app/placeholders/route-placeholder.component.spec.ts` — shows the restaurant name from `SessionReactionsService`; "Retour aux propositions" calls `DeckStore.returnFromPick()` and navigates to `/deck`; "Voir la liste" navigates to `/results` (D13).
 - [x] T039 [P] [US2] Write `app/placeholders/results-placeholder.component.spec.ts` — shows "Résultats — bientôt disponible" and the recorded reactions (D13).
 
@@ -193,6 +193,18 @@
 - [x] T078 [US2] Implement the switch overlay in `app/deck/deck.component.*` and remove the programmatic toggle from `app/deck/haptics.ts`; T077 passes.
 - [x] T079 [P] [US2] (tried, then reverted: no tick on swipes on iOS 18.7, a tap on the card ticked without reaction) Extend `app/deck/swipe-card/swipe-card.component.spec.ts` (D19 experiment): a transparent `<input type="checkbox" switch>` (aria-hidden, tabindex -1) covers the card, disabled while disabled or leaving; a drag started on it still swipes; pointer capture is taken for a mouse but not for a finger (touch is captured by its target, so the switch keeps the finger).
 - [x] T080 [US2] (reverted after the iPhone check; tests and overlay removed, touch pointer capture restored) Implement the card switch overlay in `app/deck/swipe-card/`; T079 passes. Check on iPhone; remove T079/T080 if swipes do not tick.
+
+---
+
+## Phase 7c: Tablecloth under the stack (D20 — spec amendment of 2026-11-25)
+
+**Independent Test**: open `/deck`: the card stack lies on a discreet gingham tablecloth that starts below the title; no card is visible behind the current card, while dragging or while a refinement is pending.
+
+- [x] T081 [P] [US1] Extend `app/deck/deck.component.spec.ts`: tablecloth area under the stack (AS6, FR-015); no card behind the current card, also while a refinement is pending (FR-015).
+- [x] T082 [US1] Render the tablecloth and remove the peek card in `app/deck/deck.component.html/.css/.ts`; define the gingham once as `--nappe-gingham` on the deck host and reuse it in the logo, the table and `app/deck/swipe-card/swipe-card.component.css` (D16 visual); T081 passes.
+- [x] T084 [P] [US1] Write `app/deck/cooking-toss.token.spec.ts` (1000 ms, 0 with reduced motion) and extend `app/deck/deck.store.spec.ts`: after a reaction the next card waits for one toss even when the refinement answered at once, and for the refinement when it is slower; rewind is not delayed (AS8, FR-018). Extend `app/deck/deck.component.spec.ts`: crêpe scene with "En cuisine…" under the card (AS7, FR-017).
+- [x] T085 [US1] Implement `app/deck/cooking-toss.token.ts`, the minimum wait in `app/deck/deck.store.ts`, the scene in `app/deck/deck.component.html/.css` and the text in `app/deck/deck.texts.ts`; T084 passes.
+- [ ] T083 Run prettier on changed files, the full frontend suite and the build; check on a phone at 375 px and on desktop at 1280 px.
 
 ---
 

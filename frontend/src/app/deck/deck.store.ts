@@ -1,7 +1,18 @@
 import { Injectable, Signal, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { Subscription, take } from 'rxjs';
+import {
+  Observable,
+  Subscription,
+  catchError,
+  defaultIfEmpty,
+  forkJoin,
+  map,
+  of,
+  take,
+  timer,
+} from 'rxjs';
 import { SessionReactionsService } from '../session/session-reactions.service';
+import { COOKING_TOSS_MS } from './cooking-toss.token';
 import { DECK_SIZE } from './deck-size.token';
 import { DeckSource } from './deck-source';
 import {
@@ -32,6 +43,7 @@ export class DeckStore {
   private readonly session = inject(SessionReactionsService);
   private readonly router = inject(Router);
   private readonly deckSize = inject(DECK_SIZE);
+  private readonly tossMs = inject(COOKING_TOSS_MS);
 
   private readonly stateValue = signal<DeckState | null>(null);
   private readonly inputValue = signal<DeckInput | null>(null);
@@ -104,32 +116,26 @@ export class DeckStore {
       return;
     }
     this.update(reacted);
-    this.refineThen(reacted, advance);
+    this.refineThen(reacted, advance, this.tossMs);
   }
 
-  /** Calls the refinement and applies `then` once it answered or failed (FR-006, FR-013). */
-  private refineThen(base: DeckState, then: (state: DeckState) => DeckState): void {
+  /**
+   * Calls the refinement and applies `then` once it answered or failed (FR-006, FR-013), and not
+   * before `minWaitMs` (one crêpe toss after a reaction, FR-018).
+   */
+  private refineThen(base: DeckState, then: (state: DeckState) => DeckState, minWaitMs = 0): void {
     this.refinementCall?.unsubscribe();
     this.pendingValue.set(true);
-    let answered = false;
-    this.refinementCall = this.refinement
-      .refine(refinementRequest(base))
-      .pipe(take(1))
-      .subscribe({
-        next: (result) => {
-          answered = true;
-          this.finish(then(applyRefinement(base, result)));
-        },
-        error: () => {
-          answered = true;
-          this.finish(then(markRefinementFailed(base)));
-        },
-        complete: () => {
-          if (!answered) {
-            this.finish(then(markRefinementFailed(base)));
-          }
-        },
-      });
+    const failed = markRefinementFailed(base);
+    const refined: Observable<DeckState> = this.refinement.refine(refinementRequest(base)).pipe(
+      take(1),
+      map((result) => applyRefinement(base, result)),
+      catchError(() => of(failed)),
+      defaultIfEmpty(failed),
+    );
+    const ready =
+      minWaitMs > 0 ? forkJoin([refined, timer(minWaitMs)]).pipe(map(([state]) => state)) : refined;
+    this.refinementCall = ready.subscribe((state) => this.finish(then(state)));
   }
 
   private finish(state: DeckState): void {

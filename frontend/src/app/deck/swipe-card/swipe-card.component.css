@@ -60,25 +60,20 @@
   pointer-events: none;
 }
 
-/* Default visual in the style of the Nappe logo (gingham), decision D16. */
+/* Default visual in the style of the Nappe logo (gingham), decision D16; --nappe-gingham is
+   defined on the deck host (D20). */
 .tablecloth {
   background-color: var(--color-white);
-  background-image:
-    linear-gradient(90deg, rgba(91, 75, 196, 0.55) 50%, transparent 50%),
-    linear-gradient(0deg, rgba(91, 75, 196, 0.55) 50%, transparent 50%);
+  background-image: var(--nappe-gingham);
   background-size: 28px 28px;
 }
 
-.distance,
-.stamp {
+.distance {
   position: absolute;
   display: flex;
   align-items: center;
   border-radius: 999px;
   font-weight: 600;
-}
-
-.distance {
   left: 14px;
   bottom: 14px;
   height: 32px;
@@ -87,27 +82,55 @@
   font-size: 13px;
 }
 
+/* Drag feedback: the whole photo is tinted and a large tilted stamp sits in its centre, so the
+   reaction about to be chosen is readable at a glance (replaces the small corner pill). */
 .stamp {
-  top: 18px;
-  height: 40px;
-  padding: 0 16px;
-  font-size: 15px;
-  font-weight: 700;
-  box-shadow: 0 8px 20px rgba(35, 32, 46, 0.15);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }
 
 .stamp.like {
-  left: 16px;
-  background: var(--color-primary);
-  color: var(--color-white);
-  transform: rotate(-8deg);
+  background: rgba(91, 75, 196, 0.45);
 }
 
 .stamp.nope {
-  right: 16px;
-  background: var(--color-white);
-  color: #b0284a;
-  transform: rotate(8deg);
+  background: rgba(176, 40, 74, 0.45);
+}
+
+.stamp-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 28px;
+  border: 5px solid var(--color-white);
+  border-radius: 20px;
+  color: var(--color-white);
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow: 0 2px 8px rgba(35, 32, 46, 0.35);
+  box-shadow: 0 12px 32px rgba(35, 32, 46, 0.25);
+}
+
+.stamp.like .stamp-label {
+  background: var(--color-primary);
+  transform: rotate(-12deg);
+}
+
+.stamp.nope .stamp-label {
+  background: #b0284a;
+  transform: rotate(12deg);
+}
+
+.stamp-icon {
+  font-size: 0.9em;
+  line-height: 1;
 }
 
 .body {
@@ -204,15 +227,30 @@
 }
 
 @media (max-width: 767px) {
+  /* The photo takes whatever height the card has left once the text is laid out, so the card
+     fits the phone screen with the buttons (see the deck stack). */
+  .card {
+    display: flex;
+    flex-direction: column;
+  }
+
   .hero {
-    height: 384px;
+    flex: 1 1 0;
+    height: auto;
+    min-height: 120px;
   }
 
   .body {
+    flex: none;
     padding: 16px 20px 20px;
   }
 
   .name {
     font-size: 22px;
+  }
+
+  .stamp-label {
+    font-size: 32px;
+    padding: 10px 22px;
   }
 }

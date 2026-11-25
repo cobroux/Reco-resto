@@ -13,14 +13,14 @@ import { Restaurant } from '../../restaurant/restaurant';
 import { DECK_TEXTS } from '../deck.texts';
 import { formatDistance } from '../format/distance';
 import { closingTimeAt } from '../format/opening';
+import { prefersReducedMotion } from '../motion';
 import { SWIPE_THRESHOLD_PX, SwipeDirection, classifySwipe, isDragging } from './swipe-gesture';
 
 type Direction = Exclude<SwipeDirection, 'none'>;
 
 /** Duration of the leave animation (decision D18): 300 ms, none when reduced motion is preferred. */
 export function animationDuration(win: Pick<Window, 'matchMedia'> | undefined): number {
-  const reduce = win?.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-  return reduce ? 0 : 300;
+  return prefersReducedMotion(win) ? 0 : 300;
 }
 
 export const SWIPE_ANIMATION_MS = new InjectionToken<number>('SWIPE_ANIMATION_MS', {

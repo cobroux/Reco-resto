@@ -4,6 +4,7 @@ import { Observable, Subject, of } from 'rxjs';
 import { vi } from 'vitest';
 import { Restaurant } from '../restaurant/restaurant';
 import { SessionReactionsService } from '../session/session-reactions.service';
+import { COOKING_TOSS_MS } from './cooking-toss.token';
 import { DECK_SIZE } from './deck-size.token';
 import { DeckSource } from './deck-source';
 import { currentCard, position } from './deck-state';
@@ -30,7 +31,7 @@ describe('DeckStore', () => {
   let refine: ReturnType<typeof vi.fn<(r: RefinementRequest) => Observable<readonly Restaurant[]>>>;
   let all: Restaurant[];
 
-  function setUp(count: number, mode: 'instant' | 'manual' = 'instant'): void {
+  function setUp(count: number, mode: 'instant' | 'manual' = 'instant', tossMs = 0): void {
     all = restaurants(count);
     const input: DeckInput = {
       momentLabel: 'ce soir',
@@ -53,6 +54,7 @@ describe('DeckStore', () => {
         { provide: DeckSource, useValue: { load: () => of(input) } },
         { provide: RefinementService, useValue: { refine } },
         { provide: DECK_SIZE, useValue: 3 },
+        { provide: COOKING_TOSS_MS, useValue: tossMs },
       ],
     });
     store = TestBed.inject(DeckStore);
@@ -188,6 +190,55 @@ describe('DeckStore', () => {
 
       expect(current()).toBe('r2');
       expect(store.state()!.refinementDegraded).toBe(true);
+    });
+  });
+
+  describe('crêpe toss before the next card (AS8, FR-018, D21)', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it('waits for one full toss when the refinement answers at once', () => {
+      setUp(5, 'instant', 1000);
+      store.react('liked');
+
+      vi.advanceTimersByTime(999);
+      expect(current()).toBe('r1');
+      expect(store.pending()).toBe(true);
+      vi.advanceTimersByTime(1);
+      expect(current()).toBe('r2');
+      expect(store.pending()).toBe(false);
+    });
+
+    it('waits for the refinement when it is slower than one toss', () => {
+      setUp(5, 'manual', 1000);
+      store.react('liked');
+
+      vi.advanceTimersByTime(1500);
+      expect(current()).toBe('r1');
+      pending[0].next([]);
+      expect(current()).toBe('r2');
+    });
+
+    it('waits for one toss when the refinement fails at once (FR-013)', () => {
+      setUp(5, 'manual', 1000);
+      store.react('liked');
+      pending[0].error(new Error('down'));
+
+      expect(current()).toBe('r1');
+      vi.advanceTimersByTime(1000);
+      expect(current()).toBe('r2');
+      expect(store.state()!.refinementDegraded).toBe(true);
+    });
+
+    it('does not delay a rewind', () => {
+      setUp(5, 'instant', 1000);
+      store.react('liked');
+      vi.advanceTimersByTime(1000);
+      store.rewind();
+      vi.advanceTimersByTime(0);
+
+      expect(current()).toBe('r1');
+      expect(store.pending()).toBe(false);
     });
   });
 

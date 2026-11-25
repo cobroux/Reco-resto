@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-24
 
-**Status**: Approved (product owner, 2026-11-24)
+**Status**: Approved (product owner, 2026-11-24); amendment of 2026-11-25 (US1 AS6–AS8, FR-015–FR-018: tablecloth under the stack, no card behind, "En cuisine…" crêpe toss) approved (product owner, 2026-11-25)
 
 **Input**: User description: "Spec 3.1 – Tinder-like front. The search proposes restaurant ideas in a 'Tinder' way. The LLM adapts to the swipes to propose other restaurants and refine the search. As a user, I want my reactions to refine the next cards so that the proposals match my tastes. Swipe left = no, swipe right = yes, swipe up = we take this one. The card shows the distance, today's opening hours, the restaurant name and a few relevant keywords." MVP persona: "Philipe, 38, employee and tourist in Paris, wants to find a restaurant matching his tastes and diet."
 
@@ -27,6 +27,9 @@ After his search, Philipe sees the proposed restaurants as a deck of cards, one 
 3. **Given** a restaurant has no photo, **When** its card is shown, **Then** a default tablecloth visual in the style of the Nappe logo is shown instead.
 4. **Given** no dish is known for a restaurant, **When** its card is shown, **Then** the "À goûter" block shows a default dish visual and no dish name.
 5. **Given** the deck is opened on desktop or on mobile, **Then** it is usable on both, with a layout adapted to each device.
+6. **Given** the deck is shown, **Then** the area under the card stack shows a discreet lavender gingham tablecloth in the style of the Nappe logo, so that the cards look laid on a table; no other card is shown behind the current card (amended 2026-11-25).
+7. **Given** the current card is moved away (dragged, or flying off after a reaction) or the next card is being prepared, **Then** an animated scene is visible on the tablecloth under the card: a crêpe tossed in the air from a pan and caught again, with the text "En cuisine…"; when the user asks the system to reduce motion, only the text "En cuisine…" is shown (amended 2026-11-25).
+8. **Given** the user reacted to a card, **When** the next card is prepared, **Then** it is shown only after at least one full crêpe toss, even if the refinement answered earlier; no minimum wait applies when the user asks the system to reduce motion (amended 2026-11-25).
 
 ---
 
@@ -122,6 +125,10 @@ When Philipe has reacted to every card, he lands on the results screen.
 - **FR-012**: The "Vos coups de cœur" side panel shown on the mockup MUST NOT be displayed.
 - **FR-013**: When refinement fails, the deck MUST go on with the cards already planned, without blocking the user, and MUST show a discreet, non-blocking message with the wording "Suggestions non personnalisées pour le moment"; refinement MUST resume at the next reaction once the service is available.
 - **FR-014**: After a pick, the user MUST be able to return from the route screen to the deck; the picked restaurant MUST then count as liked, and the deck MUST go on at the next card with all reactions kept.
+- **FR-015**: The area under the card stack MUST show a discreet lavender gingham tablecloth (Nappe logo style), starting below the title; no other card is shown behind the current card (amended 2026-11-25).
+- **FR-016**: The next card MUST NOT be shown before the refinement that follows a reaction has answered or failed; no refinement is computed in advance (amended 2026-11-25).
+- **FR-017**: Under the current card, on the tablecloth, the deck MUST show a crêpe tossed from a pan with the text "En cuisine…", visible as soon as the card is moved away and while the next card is prepared; with reduced motion, only the text (amended 2026-11-25).
+- **FR-018**: After a reaction, the next card MUST NOT be shown before one full crêpe toss has played (1 s), even when the refinement answered earlier; no minimum wait with reduced motion (amended 2026-11-25).
 
 ### Key Entities *(include if feature involves data)*
 

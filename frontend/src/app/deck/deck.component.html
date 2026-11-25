@@ -43,9 +43,8 @@
 
       @if (cards().length) {
         <div class="stack">
-          @if (hasNext()) {
-            <div class="peek" aria-hidden="true"></div>
-          }
+          <div class="table" data-testid="table" aria-hidden="true"></div>
+          <app-cooking-scene [waiting]="store.pending()" />
           @for (restaurant of cards(); track restaurant.id) {
             <app-swipe-card
               [restaurant]="restaurant"

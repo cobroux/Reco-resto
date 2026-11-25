@@ -5,6 +5,7 @@ import { vi } from 'vitest';
 import { Restaurant } from '../restaurant/restaurant';
 import { SessionReactionsService } from '../session/session-reactions.service';
 import { DeckSource } from './deck-source';
+import { COOKING_TOSS_MS } from './cooking-toss.token';
 import { DeckComponent } from './deck.component';
 import { DECK_TEXTS } from './deck.texts';
 import { DeckInput } from './deck.types';
@@ -39,6 +40,7 @@ describe('DeckComponent', () => {
         { provide: DeckSource, useValue: { load: () => of(input) } },
         { provide: RefinementService, useValue: refinement },
         { provide: SWIPE_ANIMATION_MS, useValue: animationMs },
+        { provide: COOKING_TOSS_MS, useValue: 0 },
       ],
     });
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
@@ -90,10 +92,47 @@ describe('DeckComponent', () => {
     });
   });
 
+  describe('D20 — tablecloth under the stack', () => {
+    const cardsInStack = () => root.querySelectorAll('.stack > app-swipe-card');
+
+    it('lays the card stack on a tablecloth (AS6, FR-015)', async () => {
+      await create();
+
+      expect(root.querySelector('.stack [data-testid="table"]')).not.toBeNull();
+    });
+
+    it('shows no card behind the current card (FR-015)', async () => {
+      await create();
+
+      expect(cardsInStack().length).toBe(1);
+    });
+
+    it('shows a crêpe tossed from a pan with "En cuisine…" under the card (AS7, FR-017, D21)', async () => {
+      await create();
+      const scene = root.querySelector('.stack [data-testid="cooking"]');
+
+      expect(scene?.textContent?.trim()).toBe('En cuisine…');
+      expect(scene?.querySelector('.pan')).not.toBeNull();
+      expect(scene?.querySelector('.crepe')).not.toBeNull();
+      expect(scene?.getAttribute('role')).toBe('status');
+      expect(scene?.getAttribute('aria-hidden')).toBe('true');
+    });
+
+    it('shows no card behind while a refinement is pending (FR-015)', async () => {
+      await create();
+      const pending = new Subject<readonly Restaurant[]>();
+      vi.spyOn(refinement, 'refine').mockReturnValue(pending);
+      await click(button(DECK_TEXTS.like));
+
+      expect(cardsInStack().length).toBe(1);
+      pending.next([]);
+    });
+  });
+
   describe('US2 — react to each card', () => {
     beforeEach(() => create());
 
-    it('dislikes with "✕" labelled "Pas envie" (AS1, D4)', async () => {
+    it('dislikes with "✕" labelled "Pas miam" (AS1, D4)', async () => {
       expect(button(DECK_TEXTS.dislike).textContent).toContain('✕');
       await click(button(DECK_TEXTS.dislike));
 
