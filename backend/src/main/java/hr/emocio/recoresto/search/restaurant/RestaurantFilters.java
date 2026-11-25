@@ -8,9 +8,10 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 
 /**
- * Keeps only restaurants that can be offered: with an address (a route must be possible), within the radius, and
- * open at the targeted moment. A restaurant whose distance or opening hours are unknown is excluded because the
- * requirement cannot be confirmed.
+ * Keeps only restaurants that can be offered: with an address (a route must be possible), within the radius, and not
+ * known to be closed at the targeted moment. A restaurant whose distance is unknown is excluded because the radius
+ * cannot be confirmed. One whose opening hours are unknown is kept (decision of 2026-11-25, a deviation from spec
+ * 002 FR-007 to report in the PR: the model often leaves the hours out or gives a single day).
  */
 @Component
 public class RestaurantFilters {
@@ -34,8 +35,8 @@ public class RestaurantFilters {
 
     private boolean isOpen(Restaurant restaurant, ZonedDateTime moment) {
         Map<String, List<OpeningPeriod>> hours = restaurant.openingHours();
-        if (hours == null) {
-            return false;
+        if (hours == null || hours.values().stream().allMatch(periods -> periods == null || periods.isEmpty())) {
+            return true; // unknown opening hours: not known to be closed
         }
         List<OpeningPeriod> periods = hours.get(moment.getDayOfWeek().name());
         if (periods == null) {

@@ -1,5 +1,6 @@
 package hr.emocio.recoresto.search.restaurant;
 
+import hr.emocio.recoresto.search.config.SearchProperties;
 import hr.emocio.recoresto.search.restaurant.OverpassClient.OverpassRefusal;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -29,10 +30,12 @@ class OverpassQueryBuilder {
 
     private final JsonMapper mapper;
     private final int timeoutSeconds;
+    private final SearchProperties searchProperties;
 
-    OverpassQueryBuilder(JsonMapper mapper, int timeoutSeconds) {
+    OverpassQueryBuilder(JsonMapper mapper, int timeoutSeconds, SearchProperties searchProperties) {
         this.mapper = mapper;
         this.timeoutSeconds = timeoutSeconds;
+        this.searchProperties = searchProperties;
     }
 
     String build(String argumentsJson) {
@@ -105,23 +108,40 @@ class OverpassQueryBuilder {
         return filters.toString();
     }
 
-    private static List<String> points(JsonNode node) {
+    private List<String> points(JsonNode node) {
         if (!node.isArray() || node.isEmpty()) {
             throw new OverpassRefusal("\"around\" must be a non-empty list of points {radius (meters), latitude, "
                     + "longitude}.");
         }
         List<String> points = new ArrayList<>();
         for (JsonNode point : node) {
-            JsonNode radius = point.path("radius");
+            long meters = meters(point);
+            double latitude = coordinate(point.path("latitude"), "latitude", 90);
+            double longitude = coordinate(point.path("longitude"), "longitude", 180);
+            points.add("(around:" + meters + "," + plain(latitude) + "," + plain(longitude) + ")");
+        }
+        return points;
+    }
+
+    /** The radius of a point: given in meters, or as a time on foot that the backend turns into meters. */
+    private long meters(JsonNode point) {
+        JsonNode radius = point.path("radius");
+        JsonNode minutes = point.path("walkingMinutes");
+        if (radius.isMissingNode() == minutes.isMissingNode()) {
+            throw new OverpassRefusal("Every point needs exactly one of radius or walkingMinutes (meters, or minutes on foot).");
+        }
+        if (!radius.isMissingNode()) {
             if (!radius.isNumber() || Math.round(radius.asDouble()) < 1) {
                 throw new OverpassRefusal("Every point needs a \"radius\" of at least 1 meter.");
             }
-            double latitude = coordinate(point.path("latitude"), "latitude", 90);
-            double longitude = coordinate(point.path("longitude"), "longitude", 180);
-            points.add("(around:" + Math.round(radius.asDouble()) + "," + plain(latitude) + "," + plain(longitude)
-                    + ")");
+            return Math.round(radius.asDouble());
         }
-        return points;
+        long meters = minutes.isNumber() && minutes.asDouble() > 0 ? searchProperties.walkingMeters(minutes.asDouble())
+                : 0;
+        if (meters < 1) {
+            throw new OverpassRefusal("\"walkingMinutes\" must be a positive number of minutes.");
+        }
+        return meters;
     }
 
     private static double coordinate(JsonNode node, String name, int limit) {

@@ -77,7 +77,7 @@ class SearchAnswerParserTest {
         SearchCriteria parsed = parser.parse(understood(criteria, "[" + OPERA + "]", "[]")).criteria();
 
         assertThat(parsed).isEqualTo(new SearchCriteria(List.of("japanese"), List.of(), null, List.of("Opéra"), null,
-                null));
+                null, null));
     }
 
     @Test
@@ -86,6 +86,14 @@ class SearchAnswerParserTest {
 
         assertThat(parser.parse(understood(criteria, "[" + OPERA + "]", "[]")).criteria().distanceLimitMeters())
                 .isEqualTo(800);
+    }
+
+    @Test
+    void aTravelTimeInTheSentenceIsKeptInMinutes() {
+        String criteria = "{\"cuisines\":[\"thai\"],\"places\":[\"Opéra\"],\"walkingMinutes\":10}";
+
+        assertThat(parser.parse(understood(criteria, "[" + OPERA + "]", "[]")).criteria().walkingMinutes())
+                .isEqualTo(10);
     }
 
     @Test
@@ -136,74 +144,12 @@ class SearchAnswerParserTest {
     }
 
     @Test
-    void restaurantFieldsAreParsedAndDistanceIsComputedFromTheNearestCenter() {
-        String chatelet = "{\"latitude\":48.8584,\"longitude\":2.3470}";
-        String restaurants = """
-                [{"name":"Thai Garden","address":"3 rue X, Paris","cuisine":"thai","diets":["vegetarian"],
-                  "openingHours":{"SATURDAY":[{"opens":"11:30","closes":"23:00"}]},
-                  "location":{"latitude":48.8690,"longitude":2.3320},
-                  "distanceMeters":5,
-                  "menu":[{"name":"Pad thai","description":"noodles","price":"12"}]}]""";
-
-        SearchAnswer answer = parser.parse(understood("{\"cuisines\":[\"thai\"]}", "[" + OPERA + "," + chatelet + "]",
-                restaurants));
-
-        Restaurant restaurant = answer.restaurants().get(0);
-        assertThat(restaurant.name()).isEqualTo("Thai Garden");
-        assertThat(restaurant.cuisine()).isEqualTo("thai");
-        assertThat(restaurant.openingHours().get("SATURDAY")).containsExactly(new OpeningPeriod("11:30", "23:00"));
-        assertThat(restaurant.menu()).hasSize(1);
-        assertThat(restaurant.location()).isEqualTo(new Position(48.8690, 2.3320));
-        double expected = new Position(48.8690, 2.3320).distanceMetersTo(new Position(48.8708, 2.3322));
-        assertThat(restaurant.distanceMeters()).isEqualTo((int) Math.round(expected));
-    }
-
-    @Test
-    void itemsWithoutANameAreDropped() {
-        String restaurants = "[{\"address\":\"1 rue A\"},{\"name\":\"  \"},{\"name\":\"Ok\"}]";
+    void restaurantsWrittenByTheModelAreIgnoredBecauseTheBackendReadsThemFromOverpass() {
+        String restaurants = "[{\"name\":\"Invented\",\"address\":\"1 rue A\"}]";
 
         SearchAnswer answer = parser.parse(understood("{\"cuisines\":[\"thai\"]}", "[" + OPERA + "]", restaurants));
 
-        assertThat(answer.restaurants()).extracting(Restaurant::name).containsExactly("Ok");
-    }
-
-    @Test
-    void missingFieldsStayAbsentAndNothingIsInvented() {
-        SearchAnswer answer = parser.parse(understood("{\"cuisines\":[\"thai\"]}", "[" + OPERA + "]",
-                "[{\"name\":\"Bare\"}]"));
-
-        Restaurant restaurant = answer.restaurants().get(0);
-        assertThat(restaurant.address()).isNull();
-        assertThat(restaurant.phone()).isNull();
-        assertThat(restaurant.openingHours()).isNull();
-        assertThat(restaurant.location()).isNull();
-        assertThat(restaurant.distanceMeters()).isNull();
-    }
-
-    @Test
-    void distanceGivenByTheModelIsNeverTrustedWithoutALocation() {
-        SearchAnswer answer = parser.parse(understood("{\"cuisines\":[\"thai\"]}", "[" + OPERA + "]",
-                "[{\"name\":\"X\",\"distanceMeters\":5}]"));
-
-        assertThat(answer.restaurants().get(0).distanceMeters()).isNull();
-    }
-
-    @Test
-    void restaurantLocationWithAnInvalidCoordinateIsDropped() {
-        SearchAnswer answer = parser.parse(understood("{\"cuisines\":[\"thai\"]}", "[" + OPERA + "]",
-                "[{\"name\":\"X\",\"location\":{\"latitude\":99.0,\"longitude\":2.3}}]"));
-
-        Restaurant restaurant = answer.restaurants().get(0);
-        assertThat(restaurant.location()).isNull();
-        assertThat(restaurant.distanceMeters()).isNull();
-    }
-
-    @Test
-    void anItemThatCannotBeReadIsDroppedAndTheOthersKept() {
-        String restaurants = "[{\"name\":\"Bad\",\"menu\":\"not a list\"},{\"name\":\"Good\"}]";
-
-        SearchAnswer answer = parser.parse(understood("{\"cuisines\":[\"thai\"]}", "[" + OPERA + "]", restaurants));
-
-        assertThat(answer.restaurants()).extracting(Restaurant::name).containsExactly("Good");
+        assertThat(answer.understood()).isTrue();
+        assertThat(answer.restaurants()).isEmpty();
     }
 }

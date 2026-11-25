@@ -38,6 +38,17 @@ public class SearchService {
         this.properties = properties;
     }
 
+    /** A distance of the sentence, else a travel time on foot, else the default radius. */
+    private double radiusMeters(SearchCriteria criteria) {
+        if (criteria.distanceLimitMeters() != null) {
+            return criteria.distanceLimitMeters();
+        }
+        if (criteria.walkingMinutes() != null) {
+            return properties.walkingMeters(criteria.walkingMinutes());
+        }
+        return properties.defaultRadiusKm() * 1000;
+    }
+
     public SearchResult search(SearchRequest request, boolean includeZone) {
         log.info("Search received ({} characters, position {})", request.sentence().length(),
                 request.position() == null ? "absent" : "given");
@@ -57,8 +68,7 @@ public class SearchService {
         if (answer.centers().isEmpty()) {
             throw new SearchException(SearchErrorCode.PLACE_REQUIRED, "A place is required");
         }
-        double radiusMeters = criteria.distanceLimitMeters() != null ? criteria.distanceLimitMeters()
-                : properties.defaultRadiusKm() * 1000;
+        double radiusMeters = radiusMeters(criteria);
 
         log.info("Moment {}, radius {} m", moment, Math.round(radiusMeters));
         // The answer holds the restaurants of every place; their distance is the one to the nearest place.

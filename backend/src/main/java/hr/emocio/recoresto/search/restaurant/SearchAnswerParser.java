@@ -10,9 +10,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Reads the final answer of the language model into a {@link SearchAnswer} and checks what the backend can check:
- * coordinates are valid, items that cannot be read are dropped, a missing field stays absent, and the distance is
- * computed here from the nearest search point, never taken from the model.
+ * Reads the final answer of the language model into a {@link SearchAnswer}: what it understood (criteria) and the
+ * search points, with their coordinates checked. The model gives no restaurant: any it writes is ignored, the backend
+ * reads them from the Overpass answers ({@link OsmRestaurantMapper}).
  */
 @Component
 public class SearchAnswerParser {
@@ -50,30 +50,7 @@ public class SearchAnswerParser {
         for (JsonNode node : root.path("centers")) {
             positionOf(node).ifPresent(centers::add);
         }
-        List<Restaurant> restaurants = new ArrayList<>();
-        for (JsonNode node : root.path("restaurants")) {
-            restaurantOf(node, centers).ifPresent(restaurants::add);
-        }
-        return new SearchAnswer(true, false, criteria, centers, restaurants);
-    }
-
-    private java.util.Optional<Restaurant> restaurantOf(JsonNode node, List<Position> centers) {
-        try {
-            Restaurant parsed = mapper.treeToValue(node, Restaurant.class);
-            if (parsed.name() == null || parsed.name().isBlank()) {
-                return java.util.Optional.empty();
-            }
-            Position location = parsed.location() != null && isValid(parsed.location()) ? parsed.location() : null;
-            Integer distance = location == null ? null : nearestCenterDistance(location, centers);
-            return java.util.Optional.of(parsed.withLocation(location, distance));
-        } catch (JacksonException e) {
-            return java.util.Optional.empty();
-        }
-    }
-
-    private static Integer nearestCenterDistance(Position location, List<Position> centers) {
-        return centers.stream().mapToDouble(location::distanceMetersTo).min().stream()
-                .mapToObj(meters -> (int) Math.round(meters)).findFirst().orElse(null);
+        return new SearchAnswer(true, false, criteria, centers, List.of());
     }
 
     private static java.util.Optional<Position> positionOf(JsonNode node) {

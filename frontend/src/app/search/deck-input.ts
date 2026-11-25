@@ -63,6 +63,7 @@ function toDeckRestaurant(restaurant: Restaurant & { address: string; distanceMe
   return {
     id: `${restaurant.name}|${restaurant.address}`,
     name: restaurant.name,
+    address: restaurant.address,
     distanceMeters: restaurant.distanceMeters,
     cuisine: restaurant.cuisine ?? '',
     keywords: [...(restaurant.keywords ?? []), ...(restaurant.diets ?? [])],

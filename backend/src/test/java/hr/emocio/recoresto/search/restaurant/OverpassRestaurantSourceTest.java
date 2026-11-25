@@ -11,15 +11,15 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import hr.emocio.recoresto.search.api.SearchErrorCode;
 import hr.emocio.recoresto.search.api.SearchException;
 import hr.emocio.recoresto.search.config.OverpassProperties;
 import hr.emocio.recoresto.search.config.SearchProperties;
 import hr.emocio.recoresto.search.llm.LlmChatClient;
 import hr.emocio.recoresto.search.restaurant.OverpassClient.OverpassRefusal;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -29,21 +29,33 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+/**
+ * The model understands the sentence and searches through the overpass tool; the restaurants are read by the backend
+ * from the Overpass answers, never from the words of the model.
+ */
 class OverpassRestaurantSourceTest {
 
-    private static final String FINAL_ANSWER = """
+    /** What the model answers: what it understood and the search points, no restaurant. */
+    private static final String ANSWER = """
             {"understood":true,"criteria":{"cuisines":["thai"],"places":["Opéra"],"moment":"now"},
-             "centers":[{"latitude":48.8708,"longitude":2.3322}],
-             "restaurants":[{"name":"Thai Garden","address":"3 rue X, Paris",
-               "location":{"latitude":48.8690,"longitude":2.3320}}]}""";
+             "centers":[{"latitude":48.8708,"longitude":2.3322}]}""";
 
     /** Tool arguments in the format of the Overpass tag filters, and the query the backend builds from them. */
     private static final String ARGS = "{\"around\":[{\"radius\":300,\"latitude\":48.87,\"longitude\":2.33}],"
             + "\"tags\":[{\"key\":\"amenity\",\"value\":\"restaurant\"}]}";
     private static final String QL =
             "[out:json][timeout:30];nwr[\"amenity\"=\"restaurant\"](around:300,48.87,2.33);out center;";
+
+    /** An answer of Overpass with one named restaurant, one unnamed element and noise. */
+    private static final String OVERPASS_ANSWER = """
+            {"version":0.6,"generator":"Overpass API","elements":[
+              {"type":"node","id":7,"lat":48.8690,"lon":2.3320,"tags":{"name":"Thai Garden","cuisine":"thai",
+               "addr:housenumber":"3","addr:street":"Rue X","addr:postcode":"75002","addr:city":"Paris",
+               "source":"survey"}},
+              {"type":"node","id":8,"lat":48.87,"lon":2.33,"tags":{"cuisine":"thai"}}]}""";
 
     private final LlmChatClient llm = mock(LlmChatClient.class);
     private final OverpassClient overpass = mock(OverpassClient.class);
@@ -69,8 +81,24 @@ class OverpassRestaurantSourceTest {
         logs.start();
         logger.addAppender(logs);
         source = new OverpassRestaurantSource(llm, overpass, new SearchAnswerParser(mapper),
-                new OverpassProperties("https://overpass.test", 30, 500, 300, 4, null, null), new SearchProperties(2.5, 15),
-                clock, mapper);
+                new OsmRestaurantMapper(), new OverpassProperties("https://overpass.test", 30, 500, 300, 4, null, null),
+                new SearchProperties(2.5, 15, 5), clock, mapper);
+    }
+
+    private JsonNode overpassAnswers() {
+        return mapper.readTree(OVERPASS_ANSWER);
+    }
+
+    /** The model calls the tool once per given arguments, then gives its final reply; returns the search answer. */
+    private SearchAnswer searchAfterToolCalls(String finalReply, String... argumentsOfTheCalls) {
+        org.mockito.Mockito.doAnswer(invocation -> {
+            LlmChatClient.ToolExecutor executor = invocation.getArgument(3);
+            for (String arguments : argumentsOfTheCalls) {
+                executor.execute("overpass", arguments);
+            }
+            return finalReply;
+        }).when(llm).complete(anyString(), anyString(), anyList(), any(), anyInt());
+        return source.find("thaï près d'Opéra");
     }
 
     /** The model asks for the given tool arguments once, then answers; returns what the executor gave back. */
@@ -79,23 +107,70 @@ class OverpassRestaurantSourceTest {
         org.mockito.Mockito.doAnswer(invocation -> {
             LlmChatClient.ToolExecutor executor = invocation.getArgument(3);
             toolResult[0] = executor.execute("overpass", arguments);
-            return FINAL_ANSWER;
+            return ANSWER;
         }).when(llm).complete(anyString(), anyString(), anyList(), any(), anyInt());
         source.find("thaï près d'Opéra");
         return toolResult[0];
     }
 
     @Test
-    void runsTheQueryAskedByTheModelAndGivesTheResultBack() {
-        when(overpass.query(QL)).thenReturn(mapper.readTree("{\"version\":0.6,\"generator\":\"Overpass API\","
-                + "\"elements\":[{\"type\":\"node\",\"id\":7,\"lat\":48.87,\"lon\":2.33,"
-                + "\"tags\":{\"name\":\"Chez Marco\",\"source\":\"survey\"}}]}"));
+    void runsTheQueryAskedByTheModelAndGivesBackOnlyTheNumberOfRestaurantsFound() {
+        when(overpass.query(QL)).thenReturn(overpassAnswers());
 
         String result = modelCallsTheToolWith(ARGS);
 
         verify(overpass).query(QL);
-        assertThat(result).contains("\"id\":7").contains("Chez Marco").doesNotContain("generator")
-                .doesNotContain("survey");
+        assertThat(result).contains("\"count\":1").doesNotContain("Thai Garden").doesNotContain("generator");
+    }
+
+    @Test
+    void restaurantsAreReadFromTheOverpassAnswerNotFromTheModel() {
+        when(overpass.query(QL)).thenReturn(overpassAnswers());
+
+        SearchAnswer answer = searchAfterToolCalls(ANSWER, ARGS);
+
+        assertThat(answer.understood()).isTrue();
+        assertThat(answer.criteria().cuisines()).containsExactly("thai");
+        assertThat(answer.restaurants()).extracting(Restaurant::name).containsExactly("Thai Garden");
+        Restaurant restaurant = answer.restaurants().get(0);
+        assertThat(restaurant.address()).isEqualTo("3 Rue X, 75002 Paris");
+        assertThat(restaurant.distanceMeters()).isBetween(190, 215);
+    }
+
+    @Test
+    void restaurantsWrittenByTheModelAreIgnored() {
+        when(overpass.query(QL)).thenReturn(overpassAnswers());
+        String withInvented = ANSWER.replace("\"centers\"", "\"restaurants\":[{\"name\":\"Invented\"}],\"centers\"");
+
+        SearchAnswer answer = searchAfterToolCalls(withInvented, ARGS);
+
+        assertThat(answer.restaurants()).extracting(Restaurant::name).containsExactly("Thai Garden");
+    }
+
+    @Test
+    void theElementsOfSeveralCallsAreMergedWithoutDuplicates() {
+        when(overpass.query(QL)).thenReturn(overpassAnswers());
+
+        SearchAnswer answer = searchAfterToolCalls(ANSWER, ARGS, ARGS);
+
+        assertThat(answer.restaurants()).hasSize(1);
+    }
+
+    @Test
+    void withoutAnyToolCallThereIsNoRestaurant() {
+        SearchAnswer answer = searchAfterToolCalls(ANSWER);
+
+        assertThat(answer.understood()).isTrue();
+        assertThat(answer.restaurants()).isEmpty();
+    }
+
+    @Test
+    void whenTheSentenceIsNotUnderstoodOrOutsideFranceNoRestaurantIsGiven() {
+        when(overpass.query(QL)).thenReturn(overpassAnswers());
+
+        assertThat(searchAfterToolCalls("{\"understood\":false}", ARGS).restaurants()).isEmpty();
+        assertThat(searchAfterToolCalls("{\"understood\":true,\"outsideFrance\":true}", ARGS).restaurants())
+                .isEmpty();
     }
 
     @Test
@@ -125,27 +200,50 @@ class OverpassRestaurantSourceTest {
         org.mockito.Mockito.verifyNoInteractions(overpass);
     }
 
-    @Test
-    void theInstructionsForbidLookingUpPlacesWithTheTool() {
-        when(llm.complete(anyString(), anyString(), anyList(), any(), anyInt())).thenReturn(FINAL_ANSWER);
-
-        source.find("thaï");
-
+    private String systemPrompt() {
+        when(llm.complete(anyString(), anyString(), anyList(), any(), anyInt())).thenReturn(ANSWER);
+        source.find("italien");
         ArgumentCaptor<String> system = ArgumentCaptor.forClass(String.class);
         verify(llm).complete(system.capture(), anyString(), anyList(), any(), anyInt());
-        assertThat(system.getValue()).contains("Never use it to look up a place");
+        return system.getValue();
+    }
+
+    @Test
+    void theInstructionsForbidLookingUpPlacesWithTheTool() {
+        assertThat(systemPrompt()).contains("Never use it to look up a place");
     }
 
     @Test
     void theInstructionsExplainHowToFilterByTypeOfCuisine() {
-        when(llm.complete(anyString(), anyString(), anyList(), any(), anyInt())).thenReturn(FINAL_ANSWER);
+        assertThat(systemPrompt()).contains("OpenStreetMap tag cuisine").contains("italian")
+                .contains("separated by ;").contains("(^|;)(italian|pizza)(;|$)")
+                .contains("The tool refuses any filter on the name tag").contains("POSIX")
+                .contains("never (?:a|b)");
+    }
 
-        source.find("italien");
+    @Test
+    void theInstructionsSayThatEveryTravelTimeIsOnFootAndToGiveItInMinutes() {
+        assertThat(systemPrompt()).contains("always on foot").contains("walkingMinutes");
+    }
 
-        ArgumentCaptor<String> system = ArgumentCaptor.forClass(String.class);
-        verify(llm).complete(system.capture(), anyString(), anyList(), any(), anyInt());
-        assertThat(system.getValue()).contains("OpenStreetMap tag cuisine").contains("italian").contains("separated by ;")
-                .contains("(^|;)(italian|pizza)(;|$)").contains("The tool refuses any filter on the name tag").contains("POSIX").contains("never (?:a|b)");
+    @Test
+    void theToolAcceptsAWalkingTimeInsteadOfARadius() {
+        when(llm.complete(anyString(), anyString(), anyList(), any(), anyInt())).thenReturn(ANSWER);
+
+        source.find("thaï");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<LlmChatClient.Tool>> tools = ArgumentCaptor.forClass(List.class);
+        verify(llm).complete(anyString(), anyString(), tools.capture(), any(), anyInt());
+        assertThat(tools.getValue().get(0).parameters().toString()).contains("walkingMinutes");
+    }
+
+    @Test
+    void theInstructionsTellTheModelNotToListTheRestaurants() {
+        String prompt = systemPrompt();
+
+        assertThat(prompt).contains("Do not list the restaurants");
+        assertThat(prompt).doesNotContain("\"restaurants\":[");
     }
 
     @Test
@@ -154,7 +252,7 @@ class OverpassRestaurantSourceTest {
         when(llm.complete(anyString(), anyString(), anyList(), any(), anyInt())).thenAnswer(invocation -> {
             LlmChatClient.ToolExecutor executor = invocation.getArgument(3);
             toolResult[0] = executor.execute("browse", "{\"url\":\"http://localhost\"}");
-            return FINAL_ANSWER;
+            return ANSWER;
         });
 
         source.find("thaï");
@@ -177,7 +275,7 @@ class OverpassRestaurantSourceTest {
 
     @Test
     void theNumberOfOverpassCallsIsBoundedByTheConfiguration() {
-        when(llm.complete(anyString(), anyString(), anyList(), any(), anyInt())).thenReturn(FINAL_ANSWER);
+        when(llm.complete(anyString(), anyString(), anyList(), any(), anyInt())).thenReturn(ANSWER);
 
         source.find("thaï");
 
@@ -186,7 +284,7 @@ class OverpassRestaurantSourceTest {
 
     @Test
     void theSentenceIsTheUserMessageAndTheCurrentMomentIsInThePrompt() {
-        when(llm.complete(anyString(), anyString(), anyList(), any(), anyInt())).thenReturn(FINAL_ANSWER);
+        when(llm.complete(anyString(), anyString(), anyList(), any(), anyInt())).thenReturn(ANSWER);
 
         source.find("thaï près d'Opéra");
 
@@ -204,18 +302,6 @@ class OverpassRestaurantSourceTest {
     }
 
     @Test
-    void theFinalAnswerIsParsedIntoASearchAnswer() {
-        when(llm.complete(anyString(), anyString(), anyList(), any(), anyInt())).thenReturn(FINAL_ANSWER);
-
-        SearchAnswer answer = source.find("thaï près d'Opéra");
-
-        assertThat(answer.understood()).isTrue();
-        assertThat(answer.criteria().cuisines()).containsExactly("thai");
-        assertThat(answer.restaurants()).extracting(Restaurant::name).containsExactly("Thai Garden");
-        assertThat(answer.restaurants().get(0).distanceMeters()).isBetween(190, 215);
-    }
-
-    @Test
     void anAnswerThatCannotBeReadIsNotUnderstood() {
         when(llm.complete(anyString(), anyString(), anyList(), any(), anyInt())).thenReturn("blablabla");
 
@@ -224,17 +310,17 @@ class OverpassRestaurantSourceTest {
 
     @Test
     void theRestaurantsOfTheAnswerAreLoggedWithTheirAddressAndDistance() {
-        when(llm.complete(anyString(), anyString(), anyList(), any(), anyInt())).thenReturn(FINAL_ANSWER);
+        when(overpass.query(QL)).thenReturn(overpassAnswers());
 
-        source.find("thaï près d'Opéra");
+        searchAfterToolCalls(ANSWER, ARGS);
 
         assertThat(loggedMessages()).anySatisfy(message -> assertThat(message).contains("1 restaurant")
-                .contains("Thai Garden").contains("3 rue X, Paris").containsPattern("\\d+ m"));
+                .contains("Thai Garden").contains("3 Rue X, 75002 Paris").containsPattern("\\d+ m"));
     }
 
     @Test
     void theNumberOfElementsReturnedByOverpassIsLogged() {
-        when(overpass.query(QL)).thenReturn(mapper.readTree("{\"elements\":[{\"id\":7},{\"id\":8}]}"));
+        when(overpass.query(QL)).thenReturn(overpassAnswers());
 
         modelCallsTheToolWith(ARGS);
 
@@ -259,6 +345,6 @@ class OverpassRestaurantSourceTest {
 
         assertThat(loggedMessages()).anySatisfy(m -> assertThat(m).contains("Overpass query").contains(QL));
         assertThat(loggedMessages()).anySatisfy(m -> assertThat(m).contains("refused").contains("too long"));
-        assertThat(loggedMessages()).anySatisfy(m -> assertThat(m).contains("Final LLM reply").contains("Thai Garden"));
+        assertThat(loggedMessages()).anySatisfy(m -> assertThat(m).contains("Final LLM reply").contains("understood"));
     }
 }

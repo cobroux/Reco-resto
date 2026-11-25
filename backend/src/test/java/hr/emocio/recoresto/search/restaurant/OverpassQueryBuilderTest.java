@@ -13,7 +13,8 @@ import tools.jackson.databind.json.JsonMapper;
  */
 class OverpassQueryBuilderTest {
 
-    private final OverpassQueryBuilder builder = new OverpassQueryBuilder(JsonMapper.builder().build(), 60);
+    private final OverpassQueryBuilder builder = new OverpassQueryBuilder(JsonMapper.builder().build(), 60,
+            new hr.emocio.recoresto.search.config.SearchProperties(2.5, 15, 5));
 
     private static final String AROUND_OPERA = "{\"radius\":2500,\"latitude\":48.8708,\"longitude\":2.3322}";
     private static final String RESTAURANT = "{\"key\":\"amenity\",\"value\":\"restaurant\"}";
@@ -26,6 +27,25 @@ class OverpassQueryBuilderTest {
     void anExactTagAroundAPointBecomesAJsonOverpassQuery() {
         assertThat(builder.build(args(AROUND_OPERA, RESTAURANT))).isEqualTo(
                 "[out:json][timeout:60];nwr[\"amenity\"=\"restaurant\"](around:2500,48.8708,2.3322);out center;");
+    }
+
+    @Test
+    void aWalkingTimeBecomesTheRadiusOfTheSearchAt5KmPerHour() {
+        String walking = "{\"walkingMinutes\":10,\"latitude\":48.8708,\"longitude\":2.3322}";
+
+        assertThat(builder.build(args(walking, RESTAURANT))).isEqualTo(
+                "[out:json][timeout:60];nwr[\"amenity\"=\"restaurant\"](around:833,48.8708,2.3322);out center;");
+    }
+
+    @Test
+    void aPointNeedsExactlyOneOfRadiusOrWalkingMinutes() {
+        assertRefused(args("{\"radius\":500,\"walkingMinutes\":10,\"latitude\":48.8,\"longitude\":2.3}",
+                RESTAURANT), "radius or walkingMinutes");
+        assertRefused(args("{\"latitude\":48.8,\"longitude\":2.3}", RESTAURANT), "radius or walkingMinutes");
+        assertRefused(args("{\"walkingMinutes\":0,\"latitude\":48.8,\"longitude\":2.3}", RESTAURANT),
+                "walkingMinutes");
+        assertRefused(args("{\"walkingMinutes\":\"ten\",\"latitude\":48.8,\"longitude\":2.3}", RESTAURANT),
+                "walkingMinutes");
     }
 
     @Test

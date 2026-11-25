@@ -1,11 +1,17 @@
 search:
   default-radius-km: 2.5
   deck-size: 15
+  # Every travel time is on foot; speed used to turn minutes into meters (value chosen by the team).
+  walking-speed-kmh: 5
 
 llm:
   base-url: ${LLM_BASE_URL:}
   api-key: ${LLM_API_KEY:}
   model: ${LLM_MODEL:nova-lite}
+  # Largest answer asked for: the endpoint cuts at 2000 tokens by default, the model accepts up to 10000.
+  max-tokens: ${LLM_MAX_TOKENS:10000}
+  # The same request is sent again this many times when the model answers with a blank message.
+  empty-answer-retries: ${LLM_EMPTY_ANSWER_RETRIES:2}
 
 # Provisional values, NOT validated by the team (plan.md O11). Only max-calls (1) was given by the team.
 # Each one can be overridden by the OVERPASS_* environment variable of the same name.

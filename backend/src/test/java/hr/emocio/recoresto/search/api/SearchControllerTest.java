@@ -30,7 +30,7 @@ class SearchControllerTest {
     private SearchService service;
 
     private final SearchCriteria criteria = new SearchCriteria(List.of("asian"), List.of("vegetarian"), null,
-            List.of("Opéra, Paris"), "now", null);
+            List.of("Opéra, Paris"), "now", null, null);
 
     @Test
     void returnsTheCriteriaAndTheDeckWithoutTheZoneByDefault() throws Exception {

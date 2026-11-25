@@ -26,12 +26,25 @@ class SearchPropertiesTest {
         });
     }
 
+    /** Every travel time is on foot (decision of the team, 2026-11-25); the speed is 5 km/h. */
+    @Test
+    void theWalkingSpeedIs5KmPerHourByDefaultAndConvertsMinutesToMeters() {
+        runner.run(context -> {
+            SearchProperties properties = context.getBean(SearchProperties.class);
+            assertThat(properties.walkingSpeedKmh()).isEqualTo(5.0);
+            assertThat(properties.walkingMeters(10)).isEqualTo(833);
+            assertThat(properties.walkingMeters(30)).isEqualTo(2500);
+        });
+    }
+
     @Test
     void valuesCanBeOverriddenByConfiguration() {
-        runner.withPropertyValues("search.default-radius-km=5", "search.deck-size=10").run(context -> {
+        runner.withPropertyValues("search.default-radius-km=5", "search.deck-size=10",
+                "search.walking-speed-kmh=4").run(context -> {
             SearchProperties properties = context.getBean(SearchProperties.class);
             assertThat(properties.defaultRadiusKm()).isEqualTo(5.0);
             assertThat(properties.deckSize()).isEqualTo(10);
+            assertThat(properties.walkingMeters(15)).isEqualTo(1000);
         });
     }
 }

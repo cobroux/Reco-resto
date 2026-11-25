@@ -146,6 +146,13 @@
   line-height: 1.15;
 }
 
+.address {
+  margin: -6px 0 0;
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--color-muted);
+}
+
 .chips {
   margin: 0;
   padding: 0;

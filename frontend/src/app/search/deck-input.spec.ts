@@ -74,6 +74,7 @@ describe('toDeckInput (spec 002 result for the swipe deck of spec 003)', () => {
 
       expect(mapped.id).toBe('Baan Thaï|3 rue X, Paris');
       expect(mapped.name).toBe('Baan Thaï');
+      expect(mapped.address).toBe('3 rue X, Paris');
       expect(mapped.distanceMeters).toBe(1100);
       expect(mapped.cuisine).toBe('thai');
       expect(mapped.keywords).toEqual(['spicy', 'vegetarian']);

@@ -6,6 +6,10 @@
 
 ## Summary
 
+Update of 2026-11-25 (after the first end-to-end tests): the restaurants are made by the backend from the
+OpenStreetMap tags of the Overpass answers (`OsmRestaurantMapper`, `OsmOpeningHours`); the model only returns
+what it understood and the search points. See research.md R2.
+
 The backend receives a French sentence (and optionally a device position) and hands it to an LLM
 (OpenAI-compatible endpoint, model `nova-lite`). Decision of 2026-11-25 (pivot, supersedes the
 2026-11-24 decision of an LLM with a headless-Chrome web tool): restaurants come from **Overpass

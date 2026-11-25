@@ -34,9 +34,16 @@
   invalid arguments with a message for the model. Only the two filter forms documented on that page are
   supported (no key-exists, no `!=`, no case-insensitive flag). Which OSM tags express a cuisine or a diet is
   left to the model and not verified (O13).
-- **Design consequence**: a `RestaurantSource` port returns restaurants for a search; the adapter drives
-  the LLM tool-calling loop. The backend never trusts the LLM for what it can recompute (radius, distance,
-  opening hours at the moment, address present) and drops invalid items; a missing field stays absent.
+- **Design consequence (2026-11-25, from the team, after three kinds of model failures: truncated JSON,
+  blank answer, malformed JSON, and opening hours given for a single day)**: the restaurants are NOT written
+  by the model. `OverpassRestaurantSource` keeps the named elements of every Overpass answer of the search
+  (`OverpassAnswerReducer`) and `OsmRestaurantMapper` makes the restaurants from their OpenStreetMap tags:
+  `name`, `cuisine` (as written), `diet:*=yes`, `addr:*` (a street is required), `phone` or `contact:phone`,
+  `image` (http only), `opening_hours` (read by `OsmOpeningHours`, a safe subset: anything else is unknown).
+  The model only answers what it understood (criteria, outsideFrance) and the search points; any restaurant it
+  writes is ignored, and the tool answers it with the number of restaurants found. A field OpenStreetMap does
+  not have stays absent (price level, signature dish, menu, keywords are never provided). The backend computes
+  the distance from the nearest search point.
 - **Bounds on the tool (code in the working tree, values NOT validated by the team)**: query length,
   answer size, number of calls per search, HTTP timeout (`overpass.*`). A query refused or an unusable
   answer is returned to the LLM as a message (`OverpassRefusal`) so it can correct itself; a service

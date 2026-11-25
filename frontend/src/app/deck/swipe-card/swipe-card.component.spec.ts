@@ -101,6 +101,21 @@ describe('SwipeCardComponent', () => {
       expect(root.querySelector('[data-testid="tablecloth"]')).not.toBeNull();
     });
 
+    it('shows the address under the name when it is known', async () => {
+      await create({ ...BARE, address: '3 rue X, 75002 Paris' });
+
+      const address = root.querySelector('[data-testid="address"]');
+      expect(address?.textContent?.trim()).toBe('3 rue X, 75002 Paris');
+      const name = root.querySelector('h2') as HTMLElement;
+      expect(name.nextElementSibling).toBe(address);
+    });
+
+    it('shows no address line when the address is not known', async () => {
+      await create(BARE);
+
+      expect(root.querySelector('[data-testid="address"]')).toBeNull();
+    });
+
     it('shows the default dish visual and no dish name when no dish is known (AS4)', () => {
       expect(root.querySelector('[data-testid="default-dish"]')).not.toBeNull();
       expect(root.querySelector('.dish-name')).toBeNull();

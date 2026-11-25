@@ -8,9 +8,9 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Shrinks an Overpass answer before it is given to the language model: a long raw answer made the model reply with
- * nothing. It keeps, for each element that has a name, its type, id and coordinates and the tags a restaurant of the
- * answer is made of (name, cuisine, diets, address, phone, opening hours, image: the fields of the restaurant model,
+ * Shrinks an Overpass answer to what a restaurant is made of (the input of {@link OsmRestaurantMapper}); the raw
+ * answer is far longer. It keeps, for each element that has a name, its type, id and coordinates and the tags a
+ * restaurant of the answer is made of (name, cuisine, diets, address, phone, opening hours, image: the fields of the restaurant model,
  * spec 002 FR-012). The choice of tags is not validated by the team yet (plan.md O13).
  */
 class OverpassAnswerReducer {
@@ -25,7 +25,7 @@ class OverpassAnswerReducer {
         this.mapper = mapper;
     }
 
-    String reduce(JsonNode answer) {
+    ObjectNode reduce(JsonNode answer) {
         ObjectNode reduced = mapper.createObjectNode();
         ArrayNode elements = reduced.putArray("elements");
         for (JsonNode element : answer.path("elements")) {
@@ -42,7 +42,7 @@ class OverpassAnswerReducer {
             }
             copy.set("tags", tags);
         }
-        return reduced.toString();
+        return reduced;
     }
 
     private static void copyCoordinates(JsonNode from, ObjectNode to) {

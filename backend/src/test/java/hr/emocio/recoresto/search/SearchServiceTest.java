@@ -37,13 +37,19 @@ class SearchServiceTest {
     private final RestaurantSource source = mock(RestaurantSource.class);
     private final Clock clock = Clock.fixed(Instant.parse("2026-11-24T10:00:00Z"), ZoneOffset.UTC);
     private final SearchService service = new SearchService(new MomentResolver(clock), source,
-            new RestaurantFilters(), new DeckSelector(), new SearchProperties(2.5, 15));
+            new RestaurantFilters(), new DeckSelector(), new SearchProperties(2.5, 15, 5));
 
     private final Position opera = new Position(48.8708, 2.3322);
     private final SearchRequest request = new SearchRequest("asiatique près d'Opéra", null);
 
     private SearchCriteria criteria(String moment, Integer distanceLimitMeters) {
-        return new SearchCriteria(List.of("asian"), List.of(), null, List.of("Opéra"), moment, distanceLimitMeters);
+        return new SearchCriteria(List.of("asian"), List.of(), null, List.of("Opéra"), moment, distanceLimitMeters,
+                null);
+    }
+
+    private SearchCriteria criteriaWalking(Integer walkingMinutes, Integer distanceLimitMeters) {
+        return new SearchCriteria(List.of("asian"), List.of(), null, List.of("Opéra"), "now", distanceLimitMeters,
+                walkingMinutes);
     }
 
     private SearchAnswer answer(SearchCriteria criteria, List<Position> centers, List<Restaurant> restaurants) {
@@ -90,6 +96,28 @@ class SearchServiceTest {
         sourceAnswers(answer(criteria("now", 800), List.of(opera), List.of(near, farther)));
 
         assertThat(service.search(request, false).deck()).extracting(Restaurant::name).containsExactly("near");
+    }
+
+    @Test
+    void aTravelTimeInTheSentenceIsAWalkingDistanceAt5KmPerHour() {
+        Restaurant at800 = TestRestaurants.of("near", "1 rue near", TestRestaurants.CENTER, 800,
+                TestRestaurants.everyDay("00:00", "23:59"));
+        Restaurant at900 = TestRestaurants.of("farther", "1 rue farther", TestRestaurants.CENTER, 900,
+                TestRestaurants.everyDay("00:00", "23:59"));
+        sourceAnswers(answer(criteriaWalking(10, null), List.of(opera), List.of(at800, at900)));
+
+        // 10 minutes on foot at 5 km/h = 833 m
+        assertThat(service.search(request, false).deck()).extracting(Restaurant::name).containsExactly("near");
+    }
+
+    @Test
+    void aDistanceInMetersWinsOverATravelTime() {
+        Restaurant at800 = TestRestaurants.of("near", "1 rue near", TestRestaurants.CENTER, 800,
+                TestRestaurants.everyDay("00:00", "23:59"));
+        sourceAnswers(answer(criteriaWalking(30, 500), List.of(opera), List.of(at800)));
+
+        assertThatThrownBy(() -> service.search(request, false)).isInstanceOfSatisfying(SearchException.class,
+                e -> assertThat(e.code()).isEqualTo(SearchErrorCode.NO_RESULT));
     }
 
     @Test

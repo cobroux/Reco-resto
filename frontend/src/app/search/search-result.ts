@@ -31,6 +31,8 @@ export interface SearchCriteria {
   readonly places: readonly string[];
   readonly moment?: string;
   readonly distanceLimitMeters?: number | null;
+  /** A travel time of the sentence, always on foot (the backend turns it into a distance). */
+  readonly walkingMinutes?: number | null;
 }
 
 export interface SearchResult {

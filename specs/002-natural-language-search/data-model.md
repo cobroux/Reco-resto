@@ -20,6 +20,7 @@ Derived from the spec (Key Entities, FR-001 to FR-016). Field names are proposal
 | places | list of string | Zero, one or several place names (FR-015). Empty means "use the position". |
 | moment | date-time or `now` | Defaults to `now` (FR-007); MUST NOT be in the past. |
 | distanceLimit | distance, optional | Replaces the default radius when present (FR-005). |
+| walkingMinutes | number, optional | A travel time of the sentence. Every travel time is ON FOOT (decision of the team, 2026-11-25), whatever the mode named. Used when there is no `distanceLimit`: radius = minutes x walking speed. |
 
 Budget and specific dish are never stored (FR-003): they are dropped when the criteria are built.
 The LLM produces the criteria (and the place coordinates, see research.md R3) in its answer.
@@ -53,6 +54,7 @@ targeted moment is excluded (FR-007).
 |-----|---------|--------|
 | search.default-radius-km | 2.5 | FR-004 |
 | search.deck-size | 15 | FR-008 |
+| search.walking-speed-kmh | 5 | decision of the team, 2026-11-25 (10 minutes = 833 m) |
 
 ## Error outcomes (User Story 3)
 
@@ -62,7 +64,8 @@ sentence has no place and no position was given (FR-006).
 ## SearchAnswer (internal, `restaurant/SearchAnswer`)
 
 What the restaurant source gives to `SearchService`: `understood`, `outsideFrance`, `criteria`,
-`centers` (one position per place), `restaurants`. Not part of the HTTP contract.
+`centers` (one position per place) from the model, and `restaurants` made by the backend from the Overpass
+elements (the model gives none). Not part of the HTTP contract.
 
 ## Configuration (Overpass, added 2026-11-25)
 

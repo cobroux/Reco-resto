@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -71,10 +72,25 @@ class RestaurantFiltersTest {
         assertThat(filters.apply(List.of(mondayOnly), 2500, SATURDAY_NOON.plusDays(2))).hasSize(1);
     }
 
+    /** Changed 2026-11-25 at the request of the team (spec 002 FR-007 deviation, to report in the PR). */
     @Test
-    void restaurantWithoutOpeningHoursIsExcludedBecauseItsOpeningCannotBeConfirmed() {
-        assertThat(filters.apply(List.of(of("x", "1 rue x", CENTER, 100, null)), 2500, SATURDAY_NOON)).isEmpty();
+    void restaurantWithoutAnyKnownOpeningHoursIsKeptBecauseItIsNotKnownToBeClosed() {
+        Map<String, List<OpeningPeriod>> noPeriod = new HashMap<>();
+        noPeriod.put("MONDAY", null);
+        noPeriod.put("TUESDAY", List.of());
+
+        assertThat(filters.apply(List.of(of("x", "1 rue x", CENTER, 100, null)), 2500, SATURDAY_NOON)).hasSize(1);
         assertThat(filters.apply(List.of(of("y", "1 rue y", CENTER, 100, Map.of())), 2500, SATURDAY_NOON))
+                .hasSize(1);
+        assertThat(filters.apply(List.of(of("z", "1 rue z", CENTER, 100, noPeriod)), 2500, SATURDAY_NOON))
+                .hasSize(1);
+    }
+
+    @Test
+    void restaurantWithKnownOpeningHoursThatDoNotCoverTheMomentIsStillExcluded() {
+        Map<String, List<OpeningPeriod>> mondayOnly = Map.of("MONDAY", List.of(new OpeningPeriod("12:00", "14:00")));
+
+        assertThat(filters.apply(List.of(of("x", "1 rue x", CENTER, 100, mondayOnly)), 2500, SATURDAY_NOON))
                 .isEmpty();
     }
 

@@ -13,7 +13,7 @@ class OverpassAnswerReducerTest {
     private final OverpassAnswerReducer reducer = new OverpassAnswerReducer(mapper);
 
     private JsonNode reduce(String overpassJson) {
-        return mapper.readTree(reducer.reduce(mapper.readTree(overpassJson)));
+        return reducer.reduce(mapper.readTree(overpassJson));
     }
 
     private static final String HEADER = "\"version\":0.6,\"generator\":\"Overpass API\","
@@ -87,6 +87,6 @@ class OverpassAnswerReducerTest {
         }
         String raw = "{" + HEADER + "\"elements\":[" + elements + "]}";
 
-        assertThat(reducer.reduce(mapper.readTree(raw)).length()).isLessThan(raw.length() / 2);
+        assertThat(reducer.reduce(mapper.readTree(raw)).toString().length()).isLessThan(raw.length() / 2);
     }
 }

@@ -57,6 +57,7 @@ components:
         places: { type: array, items: { type: string } }
         moment: { type: string, description: ISO 8601 date-time, or "now" }
         distanceLimitMeters: { type: integer, nullable: true }
+        walkingMinutes: { type: integer, nullable: true, description: Travel time of the sentence, always on foot (the backend turns it into a distance at the walking speed) }
     Restaurant:
       type: object
       required: [name, location, address]
