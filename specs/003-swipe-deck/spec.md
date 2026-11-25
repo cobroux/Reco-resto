@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-24
 
-**Status**: Approved (product owner, 2026-11-24); amendment of 2026-11-25 (US1 AS6–AS8, FR-015–FR-018: tablecloth under the stack, no card behind, "En cuisine…" crêpe toss) approved (product owner, 2026-11-25); amendment of 2026-11-25 (b) (FR-019–FR-021: opening the deck from the home search) pending approval
+**Status**: Approved (product owner, 2026-11-24); amendment of 2026-11-25 (US1 AS6–AS8, FR-015–FR-018: tablecloth under the stack, no card behind, "En cuisine…" crêpe toss) approved (product owner, 2026-11-25); amendment of 2026-11-25 (b) (FR-019–FR-021: opening the deck from the home search) approved (product owner, 2026-11-25)
 
 **Input**: User description: "Spec 3.1 – Tinder-like front. The search proposes restaurant ideas in a 'Tinder' way. The LLM adapts to the swipes to propose other restaurants and refine the search. As a user, I want my reactions to refine the next cards so that the proposals match my tastes. Swipe left = no, swipe right = yes, swipe up = we take this one. The card shows the distance, today's opening hours, the restaurant name and a few relevant keywords." MVP persona: "Philipe, 38, employee and tourist in Paris, wants to find a restaurant matching his tastes and diet."
 
