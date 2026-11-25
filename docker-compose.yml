@@ -1,0 +1,18 @@
+# Runs on the EC2 instance. Deployed by .github/workflows/deploy.yml.
+# IMAGE_PREFIX and IMAGE_TAG are provided by the deploy workflow.
+services:
+  backend:
+    image: ${IMAGE_PREFIX}-backend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      # The instance has 1 GiB of RAM: cap the JVM heap.
+      JAVA_TOOL_OPTIONS: -Xmx384m
+    # No published port: only the frontend (nginx) reaches the backend.
+
+  frontend:
+    image: ${IMAGE_PREFIX}-frontend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
