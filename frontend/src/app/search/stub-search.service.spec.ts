@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { STUB_DECK_INPUT } from '../deck/stub/stub-restaurants';
 import { StubSearchService } from './stub-search.service';
 
 describe('StubSearchService', () => {
@@ -6,7 +7,7 @@ describe('StubSearchService', () => {
     vi.useRealTimers();
   });
 
-  it('emits once and completes after 500 ms', () => {
+  it('emits the stub deck input once and completes after 500 ms', () => {
     vi.useFakeTimers();
     const next = vi.fn();
     const complete = vi.fn();
@@ -19,6 +20,7 @@ describe('StubSearchService', () => {
 
     vi.advanceTimersByTime(1);
     expect(next).toHaveBeenCalledTimes(1);
+    expect(next).toHaveBeenCalledWith(STUB_DECK_INPUT);
     expect(complete).toHaveBeenCalledTimes(1);
   });
 });

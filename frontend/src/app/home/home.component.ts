@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
+import { SearchResultStore } from '../search/search-result.store';
 import { SearchService } from '../search/search.service';
 import { DIET_TILES, HOME_TEXTS } from './home.texts';
 
@@ -11,6 +13,8 @@ import { DIET_TILES, HOME_TEXTS } from './home.texts';
 })
 export class HomeComponent {
   private readonly searchService = inject(SearchService);
+  private readonly results = inject(SearchResultStore);
+  private readonly router = inject(Router);
 
   protected readonly texts = HOME_TEXTS;
   protected readonly tiles = DIET_TILES;
@@ -21,10 +25,13 @@ export class HomeComponent {
   protected readonly searching = signal(false);
   /** True after an empty submission (FR-004); reset when the user types. */
   protected readonly emptyError = signal(false);
+  /** True after a failed search (spec 003 FR-019, T5); reset when the user types or submits again. */
+  protected readonly searchError = signal(false);
 
   protected onInput(event: Event): void {
     this.sentence.set((event.target as HTMLInputElement).value);
     this.emptyError.set(false);
+    this.searchError.set(false);
   }
 
   protected onSubmit(event: Event): void {
@@ -38,10 +45,18 @@ export class HomeComponent {
       return;
     }
     this.emptyError.set(false);
+    this.searchError.set(false);
     this.searching.set(true);
     this.searchService
       .search(this.sentence())
       .pipe(finalize(() => this.searching.set(false)))
-      .subscribe();
+      .subscribe({
+        // The deck opens on the result of this search (spec 003 FR-019, FR-020).
+        next: (result) => {
+          this.results.set(result);
+          void this.router.navigate(['/deck']);
+        },
+        error: () => this.searchError.set(true),
+      });
   }
 }

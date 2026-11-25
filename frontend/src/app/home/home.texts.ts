@@ -9,6 +9,8 @@ export const HOME_TEXTS = {
   emptyError: "Votre recherche est vide. Ex. : asiatique végétarien près d'Opéra",
   // Wording not specified in the spec: to be validated by the product owner.
   searching: 'Recherche en cours…',
+  // Wording not specified in specs 001, 002 or 003 (T5): to be validated by the product owner.
+  searchError: 'La recherche a échoué. Veuillez réessayer.',
 } as const;
 
 export interface DietTile {

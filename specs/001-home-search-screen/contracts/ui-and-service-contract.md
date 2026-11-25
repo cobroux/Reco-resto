@@ -10,12 +10,13 @@
 
 ```text
 abstract class SearchService
-  search(sentence: string): Observable<void>
+  search(sentence: string): Observable<DeckInput>
 ```
 
 - Receives the sentence exactly as typed (FR-005).
-- Emits and completes when the search ends; errors and result shape belong to feature 002 and will extend this contract.
-- `StubSearchService` is the temporary provider. Feature 002 replaces the provider; `HomeComponent` does not change.
+- Emits the `DeckInput` of the search once (shape: `specs/003-swipe-deck/data-model.md`) and completes; errors when the search fails. Per-case error messages belong to feature 002.
+- On success, `HomeComponent` stores the result in `SearchResultStore` and opens `/deck`; on error it stays on the home screen and shows `HOME_TEXTS.searchError` (spec 003 FR-019, amendment 2026-11-25 (b)).
+- `StubSearchService` is the temporary provider (returns the 003 stub deck input after 500 ms). Feature 002 replaces the provider; `HomeComponent` does not change.
 
 ## 3. Screen contract (what tests assert)
 

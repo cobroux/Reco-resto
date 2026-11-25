@@ -55,6 +55,9 @@
       @if (emptyError()) {
         <p class="message message-error" role="alert">{{ texts.emptyError }}</p>
       }
+      @if (searchError()) {
+        <p class="message message-error" role="alert">{{ texts.searchError }}</p>
+      }
       @if (searching()) {
         <p class="message" role="status">{{ texts.searching }}</p>
       }
