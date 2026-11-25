@@ -11,10 +11,10 @@ import {
   take,
   timer,
 } from 'rxjs';
+import { SearchResultStore } from '../search/search-result.store';
 import { SessionReactionsService } from '../session/session-reactions.service';
 import { COOKING_TOSS_MS } from './cooking-toss.token';
 import { DECK_SIZE } from './deck-size.token';
-import { DeckSource } from './deck-source';
 import {
   DeckState,
   activeReactions,
@@ -33,12 +33,12 @@ import { DeckInput, ReactionKind } from './deck.types';
 import { RefinementService } from './refinement.service';
 
 /**
- * Session-wide holder of the swipe deck. Wraps the pure deck state, calls the deck source and the
- * refinement service, publishes reactions to the session and navigates to the next screens.
+ * Session-wide holder of the swipe deck. Wraps the pure deck state, reads the last search result,
+ * calls the refinement service, publishes reactions to the session and navigates to the next screens.
  */
 @Injectable({ providedIn: 'root' })
 export class DeckStore {
-  private readonly source = inject(DeckSource);
+  private readonly results = inject(SearchResultStore);
   private readonly refinement = inject(RefinementService);
   private readonly session = inject(SessionReactionsService);
   private readonly router = inject(Router);
@@ -55,22 +55,26 @@ export class DeckStore {
   /** True while waiting for a refinement result; reactions are ignored meanwhile (D2). */
   readonly pending: Signal<boolean> = this.pendingValue.asReadonly();
 
-  /** Builds the deck once per session; re-opening the deck after a pick counts as a return (FR-014). */
+  /**
+   * Builds the deck once per search result: a new result starts a new deck and discards the previous
+   * reactions (FR-020); re-opening the same deck after a pick counts as a return (FR-014).
+   */
   start(): void {
+    const input = this.results.result();
+    if (!input) {
+      return;
+    }
     const state = this.stateValue();
-    if (state) {
+    if (state && this.inputValue() === input) {
       if (state.status === 'picked') {
         this.returnFromPick();
       }
       return;
     }
-    this.source
-      .load()
-      .pipe(take(1))
-      .subscribe((input) => {
-        this.inputValue.set(input);
-        this.update(createDeck(input.restaurants, this.deckSize));
-      });
+    this.refinementCall?.unsubscribe();
+    this.pendingValue.set(false);
+    this.inputValue.set(input);
+    this.update(createDeck(input.restaurants, this.deckSize));
   }
 
   react(kind: ReactionKind): void {

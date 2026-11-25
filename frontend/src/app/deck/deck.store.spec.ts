@@ -3,10 +3,10 @@ import { Router, provideRouter } from '@angular/router';
 import { Observable, Subject, of } from 'rxjs';
 import { vi } from 'vitest';
 import { Restaurant } from '../restaurant/restaurant';
+import { SearchResultStore } from '../search/search-result.store';
 import { SessionReactionsService } from '../session/session-reactions.service';
 import { COOKING_TOSS_MS } from './cooking-toss.token';
 import { DECK_SIZE } from './deck-size.token';
-import { DeckSource } from './deck-source';
 import { currentCard, position } from './deck-state';
 import { DeckStore } from './deck.store';
 import { DeckInput } from './deck.types';
@@ -30,6 +30,7 @@ describe('DeckStore', () => {
   let pending: Subject<readonly Restaurant[]>[];
   let refine: ReturnType<typeof vi.fn<(r: RefinementRequest) => Observable<readonly Restaurant[]>>>;
   let all: Restaurant[];
+  let results: SearchResultStore;
 
   function setUp(count: number, mode: 'instant' | 'manual' = 'instant', tossMs = 0): void {
     all = restaurants(count);
@@ -51,7 +52,6 @@ describe('DeckStore', () => {
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
-        { provide: DeckSource, useValue: { load: () => of(input) } },
         { provide: RefinementService, useValue: { refine } },
         { provide: DECK_SIZE, useValue: 3 },
         { provide: COOKING_TOSS_MS, useValue: tossMs },
@@ -59,14 +59,27 @@ describe('DeckStore', () => {
     });
     store = TestBed.inject(DeckStore);
     session = TestBed.inject(SessionReactionsService);
+    results = TestBed.inject(SearchResultStore);
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    results.set(input);
     store.start();
+  }
+
+  /** A second search result, with restaurants distinct from the first one. */
+  function newSearch(): DeckInput {
+    const next: DeckInput = {
+      momentLabel: 'samedi midi',
+      targetDateTime: '2026-11-28T12:00',
+      restaurants: restaurants(4).map((r) => ({ ...r, id: `n${r.id}` })),
+    };
+    results.set(next);
+    return next;
   }
 
   const current = () => currentCard(store.state()!)?.id;
 
   describe('start (US1)', () => {
-    it('builds the deck from the deck source with the configured size', () => {
+    it('builds the deck from the search result with the configured size', () => {
       setUp(5);
 
       expect(store.state()!.size).toBe(3);
@@ -81,6 +94,51 @@ describe('DeckStore', () => {
       store.start();
 
       expect(current()).toBe('r2');
+    });
+  });
+
+  describe('new search (FR-020)', () => {
+    it('T3: starts a new deck from the new result and discards the previous reactions', () => {
+      setUp(5);
+      store.react('disliked');
+      store.react('liked');
+      expect(position(store.state()!)).toBe(3);
+
+      const next = newSearch();
+      store.start();
+
+      expect(store.input()).toBe(next);
+      expect(position(store.state()!)).toBe(1);
+      expect(current()).toBe('nr1');
+      expect(store.state()!.status).toBe('browsing');
+      expect(session.restaurants()).toEqual(next.restaurants);
+      expect(session.reactions()).toEqual([]);
+    });
+
+    it('T3: drops a refinement still running for the previous deck', () => {
+      setUp(5, 'manual');
+      store.react('liked');
+      expect(store.pending()).toBe(true);
+
+      newSearch();
+      store.start();
+      expect(store.pending()).toBe(false);
+
+      pending[0].next(all.slice(2));
+      pending[0].complete();
+      expect(current()).toBe('nr1');
+    });
+
+    it('T3: starts a new deck after a pick of the previous deck', () => {
+      setUp(5);
+      store.react('picked');
+
+      newSearch();
+      store.start();
+
+      expect(store.state()!.status).toBe('browsing');
+      expect(current()).toBe('nr1');
+      expect(session.reactions()).toEqual([]);
     });
   });
 

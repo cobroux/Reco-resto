@@ -1,10 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { Subject, of } from 'rxjs';
+import { Subject } from 'rxjs';
 import { vi } from 'vitest';
 import { Restaurant } from '../restaurant/restaurant';
+import { SearchResultStore } from '../search/search-result.store';
 import { SessionReactionsService } from '../session/session-reactions.service';
-import { DeckSource } from './deck-source';
 import { COOKING_TOSS_MS } from './cooking-toss.token';
 import { DeckComponent } from './deck.component';
 import { DECK_TEXTS } from './deck.texts';
@@ -37,12 +37,12 @@ describe('DeckComponent', () => {
       imports: [DeckComponent],
       providers: [
         provideRouter([]),
-        { provide: DeckSource, useValue: { load: () => of(input) } },
         { provide: RefinementService, useValue: refinement },
         { provide: SWIPE_ANIMATION_MS, useValue: animationMs },
         { provide: COOKING_TOSS_MS, useValue: 0 },
       ],
     });
+    TestBed.inject(SearchResultStore).set(input);
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     fixture = TestBed.createComponent(DeckComponent);
     root = fixture.nativeElement as HTMLElement;
