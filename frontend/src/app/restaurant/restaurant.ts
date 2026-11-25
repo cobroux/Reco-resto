@@ -25,4 +25,6 @@ export interface Restaurant {
   readonly weeklyHours: readonly (readonly OpeningRange[])[];
   readonly photoUrl?: string;
   readonly dish?: Dish;
+  /** Postal address when known, shown under the name (added at the request of the team; not in spec 003). */
+  readonly address?: string;
 }

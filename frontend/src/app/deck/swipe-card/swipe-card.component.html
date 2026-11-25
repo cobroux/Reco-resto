@@ -27,6 +27,9 @@
 
   <div class="body">
     <h2 class="name">{{ restaurant().name }}</h2>
+    @if (restaurant().address; as address) {
+      <p class="address" data-testid="address">{{ address }}</p>
+    }
     <ul class="chips">
       <li class="chip cuisine">{{ restaurant().cuisine }}</li>
       @for (keyword of restaurant().keywords; track keyword) {

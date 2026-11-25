@@ -1,0 +1,23 @@
+{
+  "version": 0.6,
+  "generator": "FICTITIOUS DEVELOPMENT DATA - not from OpenStreetMap",
+  "elements": [
+    {"type": "node", "id": 900000001, "lat": 48.8708, "lon": 2.3322,
+     "tags": {"name": "Opéra", "railway": "station", "addr:city": "Paris"}},
+    {"type": "node", "id": 900000011, "lat": 48.8715, "lon": 2.3305,
+     "tags": {"amenity": "restaurant", "name": "[FICTIF] Dragon d'Or", "cuisine": "chinese",
+              "diet:vegetarian": "yes", "opening_hours": "Mo-Su 06:00-23:30",
+              "addr:housenumber": "1", "addr:street": "rue Exemple", "addr:postcode": "75009",
+              "addr:city": "Paris", "phone": "+33 1 00 00 00 01"}},
+    {"type": "node", "id": 900000012, "lat": 48.8692, "lon": 2.3340,
+     "tags": {"amenity": "restaurant", "name": "[FICTIF] Jardin de Jade", "cuisine": "chinese;asian",
+              "diet:vegetarian": "only", "diet:vegan": "yes", "opening_hours": "Mo-Su 06:00-23:30",
+              "addr:housenumber": "2", "addr:street": "rue Exemple", "addr:postcode": "75002",
+              "addr:city": "Paris"}},
+    {"type": "node", "id": 900000013, "lat": 48.8725, "lon": 2.3360,
+     "tags": {"amenity": "restaurant", "name": "[FICTIF] Trattoria Prova", "cuisine": "italian",
+              "opening_hours": "Mo-Su 12:00-23:00",
+              "addr:housenumber": "3", "addr:street": "rue Exemple", "addr:postcode": "75009",
+              "addr:city": "Paris", "phone": "+33 1 00 00 00 03"}}
+  ]
+}
