@@ -1,0 +1,63 @@
+<div class="page">
+  <header class="header">
+    <span class="logo">
+      <span class="logo-mark" aria-hidden="true"></span>{{ texts.logo }}
+    </span>
+  </header>
+
+  <main class="hero">
+    <div class="panel">
+      <div class="intro">
+        <span class="badge">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5B4BC4" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" />
+            <circle cx="12" cy="10" r="2.5" />
+          </svg>
+          {{ texts.badge }}
+        </span>
+        <h1 class="title">{{ texts.title }}</h1>
+        <p class="subtitle">{{ texts.subtitle }}</p>
+      </div>
+
+      <div class="tiles">
+        @for (tile of tiles; track tile.label) {
+          <div class="tile" [style.background]="tile.background">
+            <span class="tile-icon" [style.background]="tile.iconBackground">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" [attr.stroke]="tile.iconColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                @for (path of tile.iconPaths; track path) {
+                  <path [attr.d]="path" />
+                }
+              </svg>
+            </span>
+            <span class="tile-label">{{ tile.label }}</span>
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="search">
+      <form class="search-form" (submit)="onSubmit($event)">
+        <label class="field">
+          <svg class="field-pin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" />
+            <circle cx="12" cy="10" r="2.5" />
+          </svg>
+          <input
+            type="text"
+            [placeholder]="texts.placeholder"
+            [attr.aria-label]="texts.placeholder"
+            [value]="sentence()"
+            (input)="onInput($event)"
+          />
+        </label>
+        <button type="submit" class="submit" [disabled]="searching()">{{ texts.submit }}</button>
+      </form>
+      @if (emptyError()) {
+        <p class="message message-error" role="alert">{{ texts.emptyError }}</p>
+      }
+      @if (searching()) {
+        <p class="message" role="status">{{ texts.searching }}</p>
+      }
+    </div>
+  </main>
+</div>
