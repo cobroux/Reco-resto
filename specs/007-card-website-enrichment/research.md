@@ -66,7 +66,8 @@ R7 is superseded by R13; R1, R2, R4, R6 and R12 are updated below.
   parser, resolves relative URLs with `absUrl`, handles charset); (b) regular expressions on the raw text (no new
   library, fragile on real sites: attribute order, quotes, comments, `<script>` content). **Recommendation: (a)**;
   it is a new dependency, so it is listed for team approval (plan "Technical choices to confirm at review", TC-1).
-- **HTTP client**: a `RestClient` built on the JDK `HttpClient` with redirects disabled and a per-request timeout
+- **HTTP client** (replaced for website requests by the PR #15 review, see the DNS rebinding item of R5): a
+  `RestClient` built on the JDK `HttpClient` with redirects disabled and a per-request timeout
   taken from the remaining budget (R6). This follows the code base convention (`GooglePlacesClient`, `LlmChatClient`
   use `RestClient`); `exchange()` gives access to the body stream for the size cut.
 - **Request headers**: `User-Agent` value and whether `robots.txt` is honored: PO-6. `Accept: text/html`.
@@ -80,13 +81,14 @@ The backend fetches addresses that come from Google data, from the browser (R2) 
 - **Decision**: before every connection (first request, every redirect hop, sharing-image check), the host is
   resolved and the request is refused when any resolved address is: loopback, any-local (`0.0.0.0`, `::`),
   site-local / private (10/8, 172.16/12, 192.168/16), link-local (169.254/16, fe80::/10, which covers the EC2
-  metadata address), carrier-grade NAT (100.64/10), unique-local IPv6 (fc00::/7), multicast, or an IPv4-mapped IPv6
-  form of these. Only schemes `http` / `https`. A refused hop ends the enrichment with no photo (no error to the
+  metadata address), carrier-grade NAT (100.64/10), unique-local IPv6 (fc00::/7), multicast, or an IPv6 form carrying one
+  of these IPv4 addresses (IPv4-mapped, IPv4-compatible, NAT64 `64:ff9b::/96`, 6to4 `2002::/16`; PR #15 review). Only schemes `http` / `https`. A refused hop ends the enrichment with no photo (no error to the
   user, FR-012). The ports accepted: PO-8.
-- **Residual risk**: DNS rebinding between the check and the connection (the JDK client resolves again). Pinning
-  the connection to the checked address is not possible with the JDK client and TLS SNI without a custom socket
-  layer; accepted for the POC and recorded in plan "Risks". EC2 IMDSv2 (token by PUT) further limits the metadata
-  risk; GET-only fetches cannot obtain the token.
+- **DNS rebinding** (PR #15 review, 2026-11-26): the JDK client cannot be pinned to the checked address, so the
+  fetcher uses Apache HttpClient 5 (version managed by Spring Boot) with a DNS resolver that applies the same
+  address rule: the connection only ever uses addresses that passed it, and TLS still checks the host name. Each
+  request is aborted at the end of the budget by a timer, whatever the website sends. EC2 IMDSv2 (token by PUT)
+  further limits the metadata risk; GET-only fetches cannot obtain the token.
 - **Redirect limit**: number of hops followed: PO-7 (spec T30 requires at least one).
 - **Alternatives**: an allow-list of hosts (impossible: any restaurant site); an outbound HTTP proxy with its own
   filtering (new infrastructure, rejected for the POC).

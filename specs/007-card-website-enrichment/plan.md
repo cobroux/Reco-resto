@@ -217,7 +217,7 @@ can accept or change the recommendation.
 - SC-004 (50 %) is not measured: many home pages declare a logo as `og:image`, and the model only sees addresses and
   `alt` texts, not the images. Levers: PO-3, PO-11, a multimodal choice (research R7, out of this plan).
 - Sharing image is a logo: FR-003 uses it as is (the spec takes the declared image without judging it).
-- DNS rebinding between the address check and the connection (research R5); accepted for the POC.
+- DNS rebinding between the address check and the connection: closed by the PR #15 review fix (research R5).
 - Cancelling the LLM call at the deadline relies on the JDK `HttpClient` aborting on interrupt; to be proven by T25's
   test. If not, the request thread finishes later in the background (no user impact, one executor slot held).
 - Load on the `t4g.micro`: up to 15 enrichments per search, each holding a page buffer (PO-1) and a thread.

@@ -33,6 +33,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class CuisinePhotos {
 
+    /** The longest cuisine accepted as Unsplash query (PR #15 review). */
+    public static final int MAX_CUISINE_LENGTH = 100;
+
     /** Spec FR-013: the query when the cuisine is unknown. */
     static final String UNKNOWN_CUISINE_QUERY = "restaurant";
 

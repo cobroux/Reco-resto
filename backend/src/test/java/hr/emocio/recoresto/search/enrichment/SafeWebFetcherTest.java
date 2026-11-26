@@ -18,7 +18,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.web.client.RestClient;
 
 /**
  * Spec 007 research R4, R5, R6; PO-1, PO-6, PO-7, PO-8; part of T26 and T30. Every request goes to a local fake website;
@@ -42,13 +41,13 @@ class SafeWebFetcherTest {
     }
 
     private static SafeWebFetcher loopbackAllowed(CardEnrichmentProperties properties) {
-        return new SafeWebFetcher(RestClient.builder(), properties, SafeWebFetcher::resolve,
+        return new SafeWebFetcher(properties, SafeWebFetcher::resolve,
                 address -> address.isLoopbackAddress() || SafeWebFetcher.isPublic(address));
     }
 
     /** The production rule, with a fake resolver so that no DNS request is made. */
     private static SafeWebFetcher strict(CardEnrichmentProperties properties, String... addresses) {
-        return new SafeWebFetcher(RestClient.builder(), properties, host -> Arrays.stream(addresses)
+        return new SafeWebFetcher(properties, host -> Arrays.stream(addresses)
                 .map(SafeWebFetcherTest::address).toList(), SafeWebFetcher::isPublic);
     }
 
@@ -79,14 +78,15 @@ class SafeWebFetcherTest {
     @ValueSource(strings = {"127.0.0.1", "127.1.2.3", "::1", "0.0.0.0", "0.1.2.3", "::", "10.0.0.1", "10.255.255.255",
             "172.16.0.1", "172.31.255.254", "192.168.1.1", "169.254.0.1", "169.254.169.254", "fe80::1", "100.64.0.1",
             "100.127.255.254", "fc00::1", "fd12:3456::1", "224.0.0.1", "239.255.255.250", "ff02::1",
-            "::ffff:127.0.0.1", "::ffff:10.0.0.1", "::ffff:169.254.169.254", "::10.0.0.1"})
+            "::ffff:127.0.0.1", "::ffff:10.0.0.1", "::ffff:169.254.169.254", "::10.0.0.1", "64:ff9b::a00:1",
+            "64:ff9b::7f00:1", "64:ff9b::a9fe:a9fe", "2002:a00:1::", "2002:7f00:1::1", "2002:a9fe:a9fe::1"})
     void nonPublicAddressesAreRefused(String literal) {
         assertThat(SafeWebFetcher.isPublic(address(literal))).isFalse();
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"93.184.216.34", "8.8.8.8", "172.32.0.1", "100.128.0.1", "2606:4700::1111",
-            "::ffff:93.184.216.34"})
+            "::ffff:93.184.216.34", "64:ff9b::808:808", "2002:808:808::1"})
     void publicAddressesAreAccepted(String literal) {
         assertThat(SafeWebFetcher.isPublic(address(literal))).isTrue();
     }
@@ -103,12 +103,29 @@ class SafeWebFetcherTest {
 
     @Test
     void theLoopbackFakeSiteItselfIsBlockedByTheProductionRule() {
-        SafeWebFetcher production = new SafeWebFetcher(RestClient.builder(),
+        SafeWebFetcher production = new SafeWebFetcher(
                 TestCardEnrichmentProperties.allowingPort(site.port()));
         site.html("/", "<html></html>");
 
         assertThat(failure(production, site.url("/"))).isEqualTo(EnrichmentOutcome.BLOCKED_ADDRESS);
         assertThat(failure(production, URI.create("http://localhost:" + site.port() + "/")))
+                .isEqualTo(EnrichmentOutcome.BLOCKED_ADDRESS);
+        assertThat(site.requests()).isEmpty();
+    }
+
+    /**
+     * PR #15 review: DNS rebinding. The host answers a public address to the check, then a private one: the connection
+     * must use only checked addresses, so nothing is reached.
+     */
+    @Test
+    void aHostWhoseAnswerChangesAfterTheCheckIsNeverReached() {
+        AtomicInteger lookups = new AtomicInteger();
+        SafeWebFetcher production = new SafeWebFetcher(TestCardEnrichmentProperties.allowingPort(site.port()),
+                host -> List.of(address(lookups.incrementAndGet() == 1 ? "93.184.216.34" : "127.0.0.1")),
+                SafeWebFetcher::isPublic);
+        site.html("/", "<html></html>");
+
+        assertThat(failure(production, URI.create("http://rebind.test:" + site.port() + "/")))
                 .isEqualTo(EnrichmentOutcome.BLOCKED_ADDRESS);
         assertThat(site.requests()).isEmpty();
     }
@@ -247,7 +264,7 @@ class SafeWebFetcherTest {
 
     @Test
     void anUnknownHostIsUnreachable() {
-        SafeWebFetcher unknown = new SafeWebFetcher(RestClient.builder(), TestCardEnrichmentProperties.defaults(),
+        SafeWebFetcher unknown = new SafeWebFetcher(TestCardEnrichmentProperties.defaults(),
                 host -> {
                     throw new UnknownHostException(host);
                 }, SafeWebFetcher::isPublic);

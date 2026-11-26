@@ -105,6 +105,25 @@ class CardEnrichmentControllerTest {
         verify(service).enrich(eq(address("https://x.test/")), eq("Restaurant italien"));
     }
 
+    /** PR #15 review: the cuisine is the Unsplash query, so its length is bounded. */
+    @Test
+    void aCuisineLongerThan100CharactersIsABadRequestWithoutBody() throws Exception {
+        mockMvc.perform(get("/api/card-enrichment").param("website", "https://x.test/")
+                .param("cuisine", "a".repeat(101)))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(""));
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void aCuisineOf100CharactersIsAccepted() throws Exception {
+        when(service.enrich(any(), any())).thenReturn(CardEnrichment.none());
+
+        mockMvc.perform(get("/api/card-enrichment").param("website", "https://x.test/")
+                .param("cuisine", "a".repeat(100)))
+                .andExpect(status().isOk());
+    }
+
     /** FR-015, contract {@code PhotoCredit}; T39: nothing else, no key. */
     @Test
     void anUnsplashPhotoIsAnsweredWithItsCredit() throws Exception {

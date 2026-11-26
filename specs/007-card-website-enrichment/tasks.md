@@ -418,8 +418,7 @@ reactions.
 - [ ] T039 [P] Update `docs/deployment.md`: the `card-enrichment` settings and their optional `CARD_ENRICHMENT_*`
   overrides (no secret, defaults in `application.yml`); the backend now makes outbound HTTP/HTTPS requests to
   restaurant websites (ports 80/443, PO-8); in "Known limits": no abuse protection on `/api/card-enrichment` for
-  the POC, a per-IP limit is required before any public announcement (PO-9); DNS rebinding residual risk (research
-  R5); images are loaded by the user's browser from the restaurant site (PO-12) and `http` images may fail once the
+  the POC, a per-IP limit is required before any public announcement (PO-9); images are loaded by the user's browser from the restaurant site (PO-12) and `http` images may fail once the
   app is served over HTTPS (research R8).
 - [ ] T040 [P] Security review (research R5, R12): replay the SSRF curls of T023 against the running stack; grep the
   backend logs for page content and the LLM key (0 occurrences); confirm no backend cache or file is written

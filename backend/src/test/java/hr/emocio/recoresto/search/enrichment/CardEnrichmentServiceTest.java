@@ -18,7 +18,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
-import org.springframework.web.client.RestClient;
 
 /**
  * Spec 007 T5, T7, T8, T9, T10, T11, T12, T26, T28, T30, SC-002, SC-005, FR-006; amendment (b) T31, T33-T36;
@@ -42,7 +41,7 @@ class CardEnrichmentServiceTest {
         site = new FakeWebsite();
         executor = Executors.newFixedThreadPool(8);
         properties = TestCardEnrichmentProperties.allowingPort(site.port());
-        SafeWebFetcher fetcher = new SafeWebFetcher(RestClient.builder(), properties, SafeWebFetcher::resolve,
+        SafeWebFetcher fetcher = new SafeWebFetcher(properties, SafeWebFetcher::resolve,
                 address -> address.isLoopbackAddress() || SafeWebFetcher.isPublic(address));
         service = new CardEnrichmentService(fetcher, new WebsitePageReader(properties), new LargestImageRule(),
                 UnsplashStub.disabled(properties), properties, executor);
@@ -212,7 +211,7 @@ class CardEnrichmentServiceTest {
 
     @Test
     void aBlockedAddressGivesNoPhoto() {
-        SafeWebFetcher strict = new SafeWebFetcher(RestClient.builder(), properties);
+        SafeWebFetcher strict = new SafeWebFetcher(properties);
         CardEnrichmentService production = new CardEnrichmentService(strict, new WebsitePageReader(properties),
                 new LargestImageRule(), UnsplashStub.disabled(properties), properties, executor);
         site.html("/", page("", ""));
@@ -250,7 +249,7 @@ class CardEnrichmentServiceTest {
     /** The service with Unsplash enabled, the local stub answering on the same fake site. */
     private CardEnrichmentService withUnsplash() {
         CardEnrichmentProperties unsplash = UnsplashStub.pointedAt(site, properties, UnsplashStub.KEY);
-        SafeWebFetcher fetcher = new SafeWebFetcher(RestClient.builder(), unsplash, SafeWebFetcher::resolve,
+        SafeWebFetcher fetcher = new SafeWebFetcher(unsplash, SafeWebFetcher::resolve,
                 address -> address.isLoopbackAddress() || SafeWebFetcher.isPublic(address));
         return new CardEnrichmentService(fetcher, new WebsitePageReader(unsplash), new LargestImageRule(),
                 UnsplashStub.cuisinePhotos(unsplash, Clock.systemUTC()), unsplash, executor);

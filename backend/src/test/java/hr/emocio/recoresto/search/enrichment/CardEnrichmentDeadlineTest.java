@@ -14,7 +14,6 @@ import java.util.concurrent.Executors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.client.RestClient;
 
 /**
  * Spec 007 T24, T25, FR-011, PO-4 (a), PO-10, research R6: the real service, reader and rule against a local fake
@@ -34,7 +33,7 @@ class CardEnrichmentDeadlineTest {
         site = new FakeWebsite();
         executor = Executors.newFixedThreadPool(1); // PO-10: a stuck task would block the next enrichment
         CardEnrichmentProperties properties = TestCardEnrichmentProperties.withPortsAndExecutor(site.port(), 1);
-        SafeWebFetcher fetcher = new SafeWebFetcher(RestClient.builder(), properties, SafeWebFetcher::resolve,
+        SafeWebFetcher fetcher = new SafeWebFetcher(properties, SafeWebFetcher::resolve,
                 address -> address.isLoopbackAddress() || SafeWebFetcher.isPublic(address));
         service = new CardEnrichmentService(fetcher, new WebsitePageReader(properties), new LargestImageRule(),
                 UnsplashStub.disabled(properties), properties, executor);
@@ -107,7 +106,7 @@ class CardEnrichmentDeadlineTest {
     void aSlowUnsplashGivesNoPhotoWithinTheBudget() {
         CardEnrichmentProperties properties = UnsplashStub.pointedAt(site,
                 TestCardEnrichmentProperties.withPortsAndExecutor(site.port(), 1), UnsplashStub.KEY);
-        SafeWebFetcher fetcher = new SafeWebFetcher(RestClient.builder(), properties, SafeWebFetcher::resolve,
+        SafeWebFetcher fetcher = new SafeWebFetcher(properties, SafeWebFetcher::resolve,
                 address -> address.isLoopbackAddress() || SafeWebFetcher.isPublic(address));
         CardEnrichmentService withUnsplash = new CardEnrichmentService(fetcher, new WebsitePageReader(properties),
                 new LargestImageRule(), UnsplashStub.cuisinePhotos(properties, Clock.systemUTC()), properties,

@@ -21,7 +21,7 @@ class ChainPropertiesTest {
     void defaultsHoldTheProposedChainsAndTheGenericHosts() {
         runner.run(context -> {
             ChainProperties properties = context.getBean(ChainProperties.class);
-            assertThat(properties.knownNames()).hasSize(38).contains("McDonald's", "O'Tacos", "Big Mamma",
+            assertThat(properties.knownNames()).hasSize(37).doesNotContain("Prêt à Manger").contains("McDonald's", "O'Tacos", "Big Mamma",
                     "Brioche Dorée");
             assertThat(properties.genericHosts()).contains("facebook.com", "instagram.com", "linktr.ee",
                     "google.com", "tripadvisor.*", "thefork.*", "lafourchette.*", "ubereats.com", "deliveroo.*");
