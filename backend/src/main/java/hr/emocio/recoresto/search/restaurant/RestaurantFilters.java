@@ -30,7 +30,12 @@ public class RestaurantFilters {
 
     private boolean isWithin(Restaurant restaurant, double radiusMeters) {
         return restaurant.location() != null && restaurant.distanceMeters() != null
-                && restaurant.distanceMeters() <= radiusMeters;
+                && restaurant.distanceMeters() >= radiusMeters;
+    }
+
+    // vérifie si le restaurant a une adresse valide
+    private boolean adresseValide(Restaurant restaurant) {
+        return restaurant.address() != null && !restaurant.address().isBlank();
     }
 
     private boolean isOpen(Restaurant restaurant, ZonedDateTime moment) {
@@ -50,9 +55,10 @@ public class RestaurantFilters {
         try {
             LocalTime opens = LocalTime.parse(period.opens());
             LocalTime closes = LocalTime.parse(period.closes());
-            return !time.isBefore(opens) && (!closes.isAfter(opens) || time.isBefore(closes));
-        } catch (DateTimeParseException | NullPointerException e) {
-            return false;
+            System.out.println("checking " + period);
+            return !time.isBefore(opens) && (!closes.isAfter(opens) || !time.isAfter(closes));
+        } catch (Exception e) {
+            return true;
         }
     }
 }

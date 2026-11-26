@@ -24,7 +24,7 @@ public class DeckSelector {
             }
         }
         List<Restaurant> zone = List.copyOf(merged.values());
-        return new Selection(zone.stream().limit(deckSize).toList(), zone);
+        return new Selection(zone.stream().limit(deckSize + 1).toList(), zone);
     }
 
     private static String key(Restaurant restaurant) {
