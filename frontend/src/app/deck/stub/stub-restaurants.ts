@@ -34,6 +34,13 @@ export const STUB_RESTAURANTS: readonly Restaurant[] = [
     weeklyHours: weekdays(LUNCH, DINNER),
     photoUrl: PHOTO,
     dish: { name: 'Risotto aux champignons' },
+    address: '12 rue des Petits-Champs, 75002 Paris',
+    menu: [
+      { name: 'Burrata et tomates anciennes', description: "Huile d'olive, basilic frais", price: '12 €' },
+      { name: 'Risotto aux champignons', description: 'Parmesan, persil, huile de truffe', price: '17 €' },
+      { name: 'Pizza Verde', description: 'Pesto, courgettes, mozzarella, roquette', price: '15 €' },
+      { name: 'Tiramisu maison', description: 'Mascarpone, café, cacao', price: '8 €' },
+    ],
   },
   {
     id: 'stub-02',
@@ -45,6 +52,10 @@ export const STUB_RESTAURANTS: readonly Restaurant[] = [
     weeklyHours: everyDay(LUNCH, DINNER),
     photoUrl: PHOTO,
     dish: { name: 'Curry vert au tofu' },
+    menu: [
+      { name: 'Curry vert au tofu', description: 'Lait de coco, basilic thaï', price: '14 €' },
+      { name: 'Pad thaï' },
+    ],
   },
   {
     id: 'stub-03',

@@ -9,6 +9,12 @@ export interface OpeningPeriod {
   readonly closes: string;
 }
 
+export interface MenuItem {
+  readonly name: string;
+  readonly description?: string;
+  readonly price?: string;
+}
+
 /** Every field but the name is optional: the data source does not always provide it (spec 002, FR-012). */
 export interface Restaurant {
   readonly name: string;
@@ -23,6 +29,7 @@ export interface Restaurant {
   readonly signatureDish?: string;
   readonly address?: string;
   readonly phone?: string;
+  readonly menu?: readonly MenuItem[];
 }
 
 export interface SearchCriteria {

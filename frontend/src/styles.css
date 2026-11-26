@@ -8,6 +8,11 @@
   --color-placeholder: #6a6578;
   --color-white: #ffffff;
   --font-sans: 'Outfit', system-ui, sans-serif;
+  /* Gingham of the Nappe logo, single source for the logo, the missing-photo visual (D16, swipe card),
+     the tablecloth (D20) and the logo of the results screen. Tile size is set by each user with background-size. */
+  --nappe-gingham:
+    linear-gradient(90deg, rgba(91, 75, 196, 0.55) 50%, transparent 50%),
+    linear-gradient(0deg, rgba(91, 75, 196, 0.55) 50%, transparent 50%);
 }
 
 *,

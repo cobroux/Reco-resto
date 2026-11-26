@@ -71,6 +71,8 @@ function toDeckRestaurant(restaurant: Restaurant & { address: string; distanceMe
     weeklyHours: weeklyHours(restaurant),
     photoUrl: restaurant.photoUrl,
     dish: restaurant.signatureDish ? { name: restaurant.signatureDish } : undefined,
+    menu: restaurant.menu,
+    phone: restaurant.phone,
   };
 }
 

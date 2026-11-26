@@ -218,4 +218,44 @@ describe('HomeComponent', () => {
       expect(root.textContent).not.toContain('Se connecter');
     });
   });
+  describe('Rotating title phrase (every 5 seconds)', () => {
+    const phrase = () => root.querySelector('h1 .rotating')?.textContent?.trim();
+
+    async function tick(ms: number): Promise<void> {
+      vi.advanceTimersByTime(ms);
+      await fixture.whenStable();
+    }
+
+    beforeEach(async () => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+      fixture.destroy();
+      await create();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('shows the first phrase at opening and keeps the full title as accessible name', () => {
+      expect(phrase()).toBe(HOME_TEXTS.titlePhrases[0]);
+      expect(root.querySelector('h1')?.getAttribute('aria-label')).toBe(HOME_TEXTS.title);
+    });
+
+    it('changes the phrase after 5 seconds, not before', async () => {
+      await tick(4999);
+      expect(phrase()).toBe(HOME_TEXTS.titlePhrases[0]);
+      await tick(1);
+      expect(phrase()).toBe(HOME_TEXTS.titlePhrases[1]);
+    });
+
+    it('goes back to the first phrase after the last one', async () => {
+      await tick(5000 * HOME_TEXTS.titlePhrases.length);
+      expect(phrase()).toBe(HOME_TEXTS.titlePhrases[0]);
+    });
+
+    it('stops the timer when the screen is destroyed', () => {
+      fixture.destroy();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+  });
 });

@@ -1,6 +1,8 @@
 <div class="page">
   <header class="header">
-    <span class="logo"><span class="logo-mark" aria-hidden="true"></span>{{ texts.logo }}</span>
+    <a class="logo" routerLink="/"
+      ><span class="logo-mark" aria-hidden="true"></span>{{ texts.logo }}</a
+    >
     <button type="button" class="pill see-list desktop" (click)="openList()">
       {{ texts.seeList }}
     </button>
@@ -31,6 +33,7 @@
         [attr.aria-valuemax]="size()"
         [attr.aria-valuenow]="position()"
         [attr.aria-label]="texts.progress(position(), size())"
+        [style.--segments]="size()"
       >
         <span [style.width.%]="(position() / size()) * 100"></span>
       </div>

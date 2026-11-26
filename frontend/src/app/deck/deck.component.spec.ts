@@ -82,6 +82,7 @@ describe('DeckComponent', () => {
       const bar = root.querySelector('[role="progressbar"]');
       expect(bar?.getAttribute('aria-valuenow')).toBe('1');
       expect(bar?.getAttribute('aria-valuemax')).toBe('15');
+      expect((bar as HTMLElement).style.getPropertyValue('--segments')).toBe('15');
     });
 
     it('does not show the "Vos coups de cœur" panel nor the card back (FR-012)', async () => {
@@ -173,6 +174,41 @@ describe('DeckComponent', () => {
       await click(links[0]);
 
       expect(navigate).toHaveBeenCalledWith(['/results']);
+    });
+  });
+
+  describe('spec 004 — card back', () => {
+    beforeEach(() => create());
+
+    const flipButton = () =>
+      root.querySelector('app-swipe-card button.flip-btn') as HTMLButtonElement;
+
+    it('keeps the reaction buttons enabled while the back is shown (FR-008)', async () => {
+      await click(flipButton());
+
+      expect(root.querySelector('[data-testid="back"]')).not.toBeNull();
+      for (const name of [DECK_TEXTS.dislike, DECK_TEXTS.like, DECK_TEXTS.pick]) {
+        expect(button(name).disabled, name).toBe(false);
+      }
+    });
+
+    it('applies a reaction made on the back to this restaurant, then shows the next front', async () => {
+      await click(flipButton());
+      await click(button(DECK_TEXTS.like));
+
+      expect(reactions()).toEqual([{ restaurantId: 'stub-01', kind: 'liked' }]);
+      expect(cardName()).toBe(STUB_RESTAURANTS[1].name);
+      expect(root.querySelector('[data-testid="back"]')).toBeNull();
+    });
+  });
+
+  describe('spec 004 — logo', () => {
+    it('is a link to the home page, without confirmation', async () => {
+      await create();
+      const logo = root.querySelector('header a.logo');
+
+      expect(logo?.getAttribute('href')).toBe('/');
+      expect(logo?.textContent).toContain(DECK_TEXTS.logo);
     });
   });
 

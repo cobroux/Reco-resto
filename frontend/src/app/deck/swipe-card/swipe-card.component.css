@@ -206,6 +206,10 @@
 
 .open {
   background: #e3f5e1;
+  color: var(--color-text);
+}
+
+.open .tile-label {
   color: #2f7a3a;
 }
 
@@ -233,31 +237,205 @@
   stroke-width: 1.5;
 }
 
-@media (max-width: 767px) {
-  /* The photo takes whatever height the card has left once the text is laid out, so the card
+/* Back of the card (spec 004). The content scrolls inside the card (US1 AS4): swiping is off there. */
+.card.flipped {
+  cursor: default;
+  touch-action: pan-y;
+  user-select: auto;
+}
+
+.back {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: flip-in 300ms ease-out;
+}
+
+@keyframes flip-in {
+  from {
+    transform: rotateY(90deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .back {
+    animation: none;
+  }
+}
+
+.back-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.back-name {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.back-meta {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--color-muted);
+}
+
+.flip-btn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-white);
+  color: var(--color-ink, #23202e);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(35, 32, 46, 0.12);
+}
+
+.flip-btn.on-photo {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+}
+
+.back-tags {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.back-tag {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  background: #e3f5e1;
+  color: #2f7a3a;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.hours-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--color-muted);
+}
+
+.hours-row.targeted {
+  background: var(--color-panel);
+  color: #3f3196;
+  font-weight: 700;
+}
+
+.back-address {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.route-btn {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-panel);
+  color: #3f3196;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dish {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-page);
+}
+
+.dish-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dish-title {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.dish-desc {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.dish-price {
+  flex: none;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.back {
+  padding: 16px 20px 20px;
+}
+
+.back-name {
+  font-size: 22px;
+}
+
+/* The photo takes whatever height the card has left once the text is laid out, so the card
      fits the phone screen with the buttons (see the deck stack). */
-  .card {
-    display: flex;
-    flex-direction: column;
-  }
+.card {
+  display: flex;
+  flex-direction: column;
+}
 
-  .hero {
-    flex: 1 1 0;
-    height: auto;
-    min-height: 120px;
-  }
+.hero {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 120px;
+}
 
-  .body {
-    flex: none;
-    padding: 16px 20px 20px;
-  }
+.body {
+  flex: none;
+  padding: 16px 20px 20px;
+}
 
-  .name {
-    font-size: 22px;
-  }
+.name {
+  font-size: 22px;
+}
 
-  .stamp-label {
-    font-size: 32px;
-    padding: 10px 22px;
-  }
+.stamp-label {
+  font-size: 32px;
+  padding: 10px 22px;
 }

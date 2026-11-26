@@ -1,12 +1,4 @@
-/* Values from the V2WebSwipe / V2MobileSwipe mockup boards; mobile layout below 768 px (D5). */
-
-/* Gingham of the Nappe logo, single source for the logo, the missing-photo visual (D16, swipe card)
-   and the tablecloth (D20). Tile size is set by each user with background-size. */
-:host {
-  --nappe-gingham:
-    linear-gradient(90deg, rgba(91, 75, 196, 0.55) 50%, transparent 50%),
-    linear-gradient(0deg, rgba(91, 75, 196, 0.55) 50%, transparent 50%);
-}
+/* Values from the V2WebSwipe / V2MobileSwipe mockup boards; the phone layout applies at every width. */
 
 .page {
   min-height: 100vh;
@@ -31,6 +23,8 @@
   gap: 10px;
   font-size: 24px;
   font-weight: 700;
+  color: inherit;
+  text-decoration: none;
 }
 
 .logo-mark {
@@ -100,11 +94,27 @@ button:disabled {
   color: var(--color-placeholder);
 }
 
+/* Segmented like the mockup (one 28 px-high-6 pill per card): the bar is masked into --segments slots
+   separated by 6 px gaps; the fill below it grows with the position. */
 .progress-bar {
   height: 6px;
-  border-radius: 999px;
   background: #e4e0f2;
   overflow: hidden;
+  --slot: calc(100% / var(--segments, 1));
+  -webkit-mask-image: repeating-linear-gradient(
+    90deg,
+    #000 0,
+    #000 calc(var(--slot) - 6px),
+    transparent calc(var(--slot) - 6px),
+    transparent var(--slot)
+  );
+  mask-image: repeating-linear-gradient(
+    90deg,
+    #000 0,
+    #000 calc(var(--slot) - 6px),
+    transparent calc(var(--slot) - 6px),
+    transparent var(--slot)
+  );
 }
 
 .progress-bar span {
@@ -214,51 +224,74 @@ button:disabled {
   color: var(--color-muted);
 }
 
+.action.main .action-label {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* The header only carries the logo (link to the home page); "Voir la liste" is in the progress row.
+   Same position and size as the home screen: 28px 40px on desktop (base rule); below 768 px the logo is
+   centred 20px from the top and the left edge (home: page padding 20px + header of 44px), 22px text. */
 @media (max-width: 767px) {
-  .header,
-  .see-list.desktop {
-    display: none;
+  .header {
+    padding: 20px 20px 0;
+    height: 64px;
   }
 
-  .see-list.mobile {
-    display: block;
-    height: 36px;
-    padding: 0 14px;
-    font-size: 14px;
+  .logo {
+    font-size: 22px;
   }
 
-  /* The whole deck (progress, title, card, buttons) fits one phone screen: the stack takes the
+  .logo-mark {
+    width: 26px;
+    height: 26px;
+    border-radius: 9px;
+    background-size: 13px 13px;
+  }
+}
+
+.see-list.desktop {
+  display: none;
+}
+
+.see-list.mobile {
+  display: block;
+  height: 36px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+/* The whole deck (progress, title, card, buttons) fits one phone screen: the stack takes the
      height left by the rest, and the card's photo shrinks with it. dvh follows the browser bars. */
-  .page {
-    min-height: 100dvh;
-  }
+.page {
+  min-height: 100dvh;
+}
 
-  .column {
-    flex: 1 1 auto;
-    padding: 12px 20px max(16px, env(safe-area-inset-bottom));
-    gap: 8px;
-  }
+.column {
+  flex: 1 1 auto;
+  padding: 12px 20px max(16px, env(safe-area-inset-bottom));
+  gap: 8px;
+}
 
-  .title {
-    font-size: 28px;
-  }
+.title {
+  font-size: 28px;
+}
 
-  /* Below 340 px the card would be cramped: the page scrolls instead. */
-  .stack {
-    flex: 1 1 0;
-    height: auto;
-    min-height: 340px;
-    margin-top: 8px;
-  }
+/* Below 340 px the card would be cramped: the page scrolls instead. */
+.stack {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 340px;
+  margin-top: 8px;
+}
 
-  /* Stays inside the 20 px side padding so the page never scrolls sideways. */
-  .table {
-    inset: -8px -20px;
-    border-radius: 40px;
-  }
+/* Stays inside the 20 px side padding so the page never scrolls sideways. */
+.table {
+  inset: -8px -20px;
+  border-radius: 40px;
+}
 
-  .actions {
-    flex: none;
-    margin-top: 24px;
-  }
+.actions {
+  flex: none;
+  margin-top: 24px;
 }

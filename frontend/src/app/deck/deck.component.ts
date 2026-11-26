@@ -6,7 +6,7 @@ import {
   inject,
   viewChild,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { canRewind, currentCard, position } from './deck-state';
 import { CookingSceneComponent } from './cooking-scene/cooking-scene.component';
 import { DeckStore } from './deck.store';
@@ -33,7 +33,7 @@ const SWIPE_BY_REACTION: Record<ReactionKind, Direction> = {
 /** Swipe deck screen (feature 003). */
 @Component({
   selector: 'app-deck',
-  imports: [SwipeCardComponent, CookingSceneComponent],
+  imports: [SwipeCardComponent, CookingSceneComponent, RouterLink],
   templateUrl: './deck.component.html',
   styleUrl: './deck.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

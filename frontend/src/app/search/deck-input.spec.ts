@@ -83,6 +83,23 @@ describe('toDeckInput (spec 002 result for the swipe deck of spec 003)', () => {
       expect(mapped.dish).toEqual({ name: 'Curry vert' });
     });
 
+    it('carries the menu and the phone of the backend (spec 004)', () => {
+      const mapped = first({
+        ...THAI,
+        phone: '+33 1 23 45 67 89',
+        menu: [
+          { name: 'Curry vert', description: 'Lait de coco', price: '14 €' },
+          { name: 'Riz' },
+        ],
+      });
+
+      expect(mapped.phone).toBe('+33 1 23 45 67 89');
+      expect(mapped.menu).toEqual([
+        { name: 'Curry vert', description: 'Lait de coco', price: '14 €' },
+        { name: 'Riz' },
+      ]);
+    });
+
     it('turns the opening hours into seven days indexed Sunday = 0', () => {
       const hours = first(THAI).weeklyHours;
 
@@ -103,6 +120,8 @@ describe('toDeckInput (spec 002 result for the swipe deck of spec 003)', () => {
       expect(mapped.priceLevel).toBeUndefined();
       expect(mapped.photoUrl).toBeUndefined();
       expect(mapped.dish).toBeUndefined();
+      expect(mapped.menu).toBeUndefined();
+      expect(mapped.phone).toBeUndefined();
       expect(mapped.weeklyHours).toEqual([[], [], [], [], [], [], []]);
     });
 

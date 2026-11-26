@@ -1,5 +1,3 @@
-import { ReactionKind } from './deck.types';
-
 /** Single source of every French text of the swipe deck and its placeholder screens. */
 export const DECK_TEXTS = {
   logo: 'Nappe',
@@ -11,16 +9,52 @@ export const DECK_TEXTS = {
   pick: 'On y va',
   rewind: 'Revenir à la carte précédente',
   toTaste: 'À goûter',
-  openUntil: (time: string) => `Ouvert jusqu'à ${time}`,
+  open: 'Ouvert',
+  until: (time: string) => `jusqu'à ${time}`,
+  openUntil: (time: string) => `${DECK_TEXTS.open} ${DECK_TEXTS.until(time)}`,
   degraded: 'Suggestions non personnalisées pour le moment',
   cooking: 'En cuisine…',
-  resultsTitle: 'Résultats — bientôt disponible',
   backToDeck: 'Retour aux propositions',
+  backToHome: "Retour à l'accueil",
+  // Back of the card (spec 004); wording of the labels is a proposal to validate (plan D-04-2, D-04-11, D-04-12).
+  flip: 'Retourner la carte',
+  hours: 'Horaires',
+  closed: 'Fermé',
+  addressTitle: 'Adresse',
+  phone: 'Téléphone',
+  detail: 'Détail',
+  hideDetail: 'Masquer le détail',
+  route: 'Itinéraire',
+  menu: 'Menu',
+  fullRoute: "Voir l'itinéraire complet",
+  routeLoading: "Calcul de l'itinéraire…",
+  routeUnavailable: "L'itinéraire n'est pas disponible pour le moment",
+  travelModes: {
+    walk: 'À pied',
+    bike: 'À vélo',
+    car: 'En voiture',
+    transit: 'Transports',
+  },
 } as const;
 
-/** Label of each reaction, reused from the deck buttons. */
-export const REACTION_LABELS: Record<ReactionKind, string> = {
-  disliked: DECK_TEXTS.dislike,
-  liked: DECK_TEXTS.like,
-  picked: DECK_TEXTS.pick,
-};
+/** Texts of the results screen (wording from the Claude Design mockup "Web 2c · Résultats"). */
+export const RESULTS_TEXTS = {
+  title: (count: number, moment: string | null) =>
+    `Vos ${count} coup${count > 1 ? 's' : ''} de cœur${moment ? ` ${moment}` : ''}`,
+  decided: (name: string) => `C’est décidé : ${name} !`,
+  emptyTitle: 'Aucun coup de cœur… pour l’instant',
+  emptySubtitle: 'Aucun « Miam » cette fois-ci.',
+  chooseSubtitle: 'Choisissez celui où vous allez, d’après vos « Miam ».',
+  decidedSubtitle: 'Bon appétit ! Vos autres « Miam » restent sous la main.',
+  suggestion: 'Notre suggestion',
+  itinerary: 'Itinéraire',
+  changeMind: 'Changer d’avis',
+  othersChoosing: 'Aussi dans vos « Miam »',
+  othersDecided: 'Vos autres « Miam »',
+  distance: 'Distance',
+  nopeSection: (count: number) => `${DECK_TEXTS.dislike} · ${count}`,
+  revive: 'Finalement, miam',
+  emptyCardTitle: 'Rien ne vous a tenté ?',
+  emptyCardBody: 'Pas de souci : refaites un tour avec d’autres propositions.',
+  redo: 'Refaire un tour',
+} as const;
