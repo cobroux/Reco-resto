@@ -20,6 +20,7 @@ import hr.emocio.recoresto.search.api.SearchRequest;
 import hr.emocio.recoresto.search.config.ChainProperties;
 import hr.emocio.recoresto.search.config.SearchProperties;
 import hr.emocio.recoresto.search.config.TestCardEnrichmentProperties;
+import hr.emocio.recoresto.search.config.ToolSearchProperties;
 import hr.emocio.recoresto.search.criteria.CriteriaMatcher;
 import hr.emocio.recoresto.search.criteria.MomentResolver;
 import hr.emocio.recoresto.search.google.GooglePlaceMapper;
@@ -36,7 +37,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.BeforeEach;
+import org.slf4j.LoggerFactory;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.JsonNode;
@@ -49,6 +55,7 @@ class SearchServiceTest {
     /** Thursday 2026-11-26, 12:00 in Paris. */
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-11-26T11:00:00Z"), ZoneOffset.UTC);
     private static final int DECK_SIZE = 4;
+    private static final ToolSearchProperties LIMITS = new ToolSearchProperties(300, 5000, 100, 120, 20, 3, 2);
 
     private final JsonMapper mapper = JsonMapper.builder().build();
     private final LlmChatClient llm = mock(LlmChatClient.class);
@@ -59,7 +66,7 @@ class SearchServiceTest {
     void setUp() {
         service = new SearchService(llm, google, new GooglePlaceMapper(TestCardEnrichmentProperties.defaults()),
                 new RestaurantFilters(new CriteriaMatcher()), new DeckSelector(new ChainProperties(null, null)),
-                new MomentResolver(CLOCK), new SearchProperties(2.5, DECK_SIZE, 5), mapper, CLOCK);
+                new MomentResolver(CLOCK), new SearchProperties(2.5, DECK_SIZE, 5), LIMITS, mapper, CLOCK);
     }
 
     private SearchResult search(String sentence) {
@@ -204,13 +211,14 @@ class SearchServiceTest {
         assertThat(names(result)).containsExactly("Resto 1", "Resto 2");
     }
 
+    /** A sentence the model does not search for is not a restaurant request ("blablabla"). */
     @Test
-    void whenTheModelAnswersWithoutSearchingTheRawSentenceIsSearched() {
-        googleFinds(1);
-        when(llm.chat(anyList(), anyList())).thenReturn(answer("Où êtes-vous ?"));
+    void whenTheModelAnswersWithoutSearchingTheSentenceIsNotUnderstood() {
+        when(llm.chat(anyList(), anyList())).thenReturn(answer("Je ne comprends pas."));
 
-        assertThat(names(search("ramen"))).containsExactly("Resto 1");
-        verify(google).searchText("ramen", HERE, 2500.0, List.of());
+        assertThatThrownBy(() -> search("blablabla")).isInstanceOfSatisfying(SearchException.class,
+                e -> assertThat(e.code()).isEqualTo(SearchErrorCode.NOT_UNDERSTOOD));
+        verify(google, never()).searchText(anyString(), any(), anyDouble(), anyList());
     }
 
     @Test
@@ -255,6 +263,46 @@ class SearchServiceTest {
         search("a");
 
         verify(google).searchText("a", HERE, 2500.0, List.of("PRICE_LEVEL_MODERATE", "PRICE_LEVEL_VERY_EXPENSIVE"));
+    }
+
+    /** PR #18 review: the number of candidates never caps a deck size above 20. */
+    @Test
+    void aDeckSizeAboveTwentyIsHonoured() {
+        service = new SearchService(llm, google, new GooglePlaceMapper(TestCardEnrichmentProperties.defaults()),
+                new RestaurantFilters(new CriteriaMatcher()), new DeckSelector(new ChainProperties(null, null)),
+                new MomentResolver(CLOCK), new SearchProperties(2.5, 25, 5), LIMITS, mapper, CLOCK);
+        googleFinds(25); // up to about 2.5 km away: searched within 5 km
+        when(llm.chat(anyList(), anyList())).thenReturn(toolCall("{\"query\":\"a\",\"radius_m\":5000}"),
+                answer("{\"picks\":[]}"));
+
+        assertThat(search("a").deck()).hasSize(25);
+    }
+
+    /** FR-016: the INFO logs hold counts and durations, never the sentence, the criteria or the restaurants. */
+    @Test
+    void theInfoLogsHoldNoUserTextNorRestaurant() {
+        googleFinds(2);
+        when(llm.chat(anyList(), anyList())).thenReturn(
+                toolCall("{\"query\":\"ramen secret\",\"diets\":[\"halal\"]}"), answer("{\"picks\":[]}"),
+                toolCall("{\"query\":\"ramen secret\"}"),
+                answer("{\"picks\":[{\"id\":\"r1\",\"reason\":\"raison secrete\"}]}"));
+        Logger logger = (Logger) LoggerFactory.getLogger(SearchService.class);
+        Level before = logger.getLevel();
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        logger.setLevel(Level.INFO);
+        try {
+            // halal: no candidate left, the search ends in NO_RESULT; then a search that finds restaurants
+            assertThatThrownBy(() -> search("ramen secret halal")).isInstanceOf(SearchException.class);
+            assertThat(names(search("ramen secret"))).contains("Resto 1");
+        } finally {
+            logger.detachAppender(appender);
+            logger.setLevel(before);
+        }
+
+        assertThat(appender.list).isNotEmpty().allSatisfy(event -> assertThat(event.getFormattedMessage())
+                .doesNotContain("secret", "halal", "Resto", "rue X", "secrete"));
     }
 
     @Test

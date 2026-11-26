@@ -5,6 +5,7 @@ import hr.emocio.recoresto.search.api.SearchErrorCode;
 import hr.emocio.recoresto.search.api.SearchException;
 import hr.emocio.recoresto.search.api.SearchRequest;
 import hr.emocio.recoresto.search.config.SearchProperties;
+import hr.emocio.recoresto.search.config.ToolSearchProperties;
 import hr.emocio.recoresto.search.criteria.MomentResolver;
 import hr.emocio.recoresto.search.criteria.SearchCriteria;
 import hr.emocio.recoresto.search.google.GooglePlace;
@@ -44,22 +45,16 @@ import tools.jackson.databind.json.JsonMapper;
  * <li>The model picks and ranks candidates by id, with a short reason; the backend builds the cards from the Google
  * data, so no restaurant can be invented.</li>
  * </ol>
- * At most {@link #MAX_ROUNDS} model requests and {@link #MAX_TOOL_CALLS} searches. Any failure of the model falls
- * back to the backend: search with the raw sentence if the model never searched, backend order if it never picked.
+ * At most {@code search.tool.max-rounds} model requests and {@code search.tool.max-tool-calls} searches. A model
+ * that answers without searching did not take the sentence for a restaurant request: {@code NOT_UNDERSTOOD}. Any
+ * failure of the model falls back to the backend: search with the raw sentence if the model never searched, backend
+ * order if it never picked.
  */
 @Service
 public class SearchService {
 
     private static final Logger log = LoggerFactory.getLogger(SearchService.class);
 
-    static final int MAX_ROUNDS = 3;
-    static final int MAX_TOOL_CALLS = 2;
-    /** Candidates shown to the model: enough to choose from, small enough to keep the second request fast. */
-    static final int MAX_CANDIDATES = 20;
-    static final int MIN_RADIUS_METERS = 300;
-    static final int MAX_RADIUS_METERS = 5000;
-    private static final int MAX_QUERY_LENGTH = 100;
-    private static final int MAX_REASON_LENGTH = 120;
     private static final String TOOL_NAME = "search_restaurants";
 
     private static final String GOOGLE_PRICE_PREFIX = "PRICE_LEVEL_";
@@ -128,12 +123,13 @@ public class SearchService {
     private final DeckSelector deckSelector;
     private final MomentResolver momentResolver;
     private final SearchProperties properties;
+    private final ToolSearchProperties limits;
     private final JsonMapper mapper;
     private final Clock clock;
 
     public SearchService(LlmChatClient llm, GooglePlacesClient google, GooglePlaceMapper placeMapper,
             RestaurantFilters filters, DeckSelector deckSelector, MomentResolver momentResolver,
-            SearchProperties properties, JsonMapper mapper, Clock clock) {
+            SearchProperties properties, ToolSearchProperties limits, JsonMapper mapper, Clock clock) {
         this.llm = llm;
         this.google = google;
         this.placeMapper = placeMapper;
@@ -141,6 +137,7 @@ public class SearchService {
         this.deckSelector = deckSelector;
         this.momentResolver = momentResolver;
         this.properties = properties;
+        this.limits = limits;
         this.mapper = mapper;
         this.clock = clock;
     }
@@ -158,7 +155,7 @@ public class SearchService {
 
         ToolRun last = null;
         int toolCalls = 0;
-        for (int round = 1; round <= MAX_ROUNDS; round++) {
+        for (int round = 1; round <= limits.maxRounds(); round++) {
             long roundStart = System.nanoTime();
             JsonNode message;
             try {
@@ -174,7 +171,8 @@ public class SearchService {
                 for (JsonNode call : calls) {
                     String arguments = call.path("function").path("arguments").asString();
                     String result;
-                    if (toolCalls < MAX_TOOL_CALLS && TOOL_NAME.equals(call.path("function").path("name").asString())) {
+                    if (toolCalls < limits.maxToolCalls()
+                            && TOOL_NAME.equals(call.path("function").path("name").asString())) {
                         toolCalls++;
                         log.debug("Agent tool call {}: {}", toolCalls, arguments);
                         ToolRun run = runTool(arguments, position);
@@ -192,8 +190,8 @@ public class SearchService {
                 continue;
             }
             if (last == null) {
-                log.warn("Agent round {}: the model answered without searching", round);
-                break;
+                log.info("Agent round {}: the model answered without searching: not understood", round);
+                throw new SearchException(SearchErrorCode.NOT_UNDERSTOOD, "The sentence is not a restaurant request");
             }
             SearchResult result = result(last, picks(message.path("content").asString(), last), includeZone);
             log.info("Agent search done in {} ms ({} model rounds, {} searches)", millis(start), round, toolCalls);
@@ -219,13 +217,13 @@ public class SearchService {
         JsonNode args = JsonAnswers.firstObject(mapper, argumentsJson).orElse(mapper.createObjectNode());
 
         String query = text(args.path("query"));
-        query = query == null ? "restaurant" : query.substring(0, Math.min(query.length(), MAX_QUERY_LENGTH));
+        query = query == null ? "restaurant" : query.substring(0, Math.min(query.length(), limits.maxQueryLength()));
 
         List<String> googlePrices = new ArrayList<>();
         args.path("price_levels").forEach(level -> {
-            String google = PRICE_LEVELS.get(level.asString().toLowerCase(Locale.ROOT));
-            if (google != null && !googlePrices.contains(google)) {
-                googlePrices.add(google);
+            String googleLevel = PRICE_LEVELS.get(level.asString().toLowerCase(Locale.ROOT));
+            if (googleLevel != null && !googlePrices.contains(googleLevel)) {
+                googlePrices.add(googleLevel);
             }
         });
 
@@ -243,7 +241,7 @@ public class SearchService {
         } else if (args.path("walking_minutes").isNumber()) {
             radius = properties.walkingMeters(args.path("walking_minutes").asDouble());
         }
-        radius = Math.clamp(radius, MIN_RADIUS_METERS, MAX_RADIUS_METERS);
+        radius = Math.clamp(radius, limits.minRadiusMeters(), limits.maxRadiusMeters());
 
         String openAt = text(args.path("open_at"));
         ZonedDateTime moment;
@@ -269,7 +267,8 @@ public class SearchService {
             });
         }
         List<Restaurant> kept = filters.apply(List.copyOf(places.values()), criteria, radius, moment);
-        DeckSelector.Selection selection = deckSelector.select(List.of(kept), MAX_CANDIDATES);
+        DeckSelector.Selection selection = deckSelector.select(List.of(kept),
+                Math.max(limits.maxCandidates(), properties.deckSize()));
         log.info("Agent tool: query of {} chars, prices {}, {} diets, radius {} m, moment {} -> Google {}, kept {}, "
                 + "candidates {} in {} ms", query.length(), googlePrices, diets.size(), Math.round(radius), moment,
                 raw.size(), kept.size(), selection.deck().size(), millis(start));
@@ -319,8 +318,8 @@ public class SearchService {
                 continue;
             }
             String reason = text(pick.path("reason"));
-            if (reason != null && reason.length() > MAX_REASON_LENGTH) {
-                reason = reason.substring(0, MAX_REASON_LENGTH);
+            if (reason != null && reason.length() > limits.maxReasonLength()) {
+                reason = reason.substring(0, limits.maxReasonLength());
             }
             picks.add(Map.entry(index, reason == null ? "" : reason));
         }
