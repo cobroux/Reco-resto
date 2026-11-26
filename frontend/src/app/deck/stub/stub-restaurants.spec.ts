@@ -21,6 +21,11 @@ describe('STUB_DECK_INPUT (D6)', () => {
     expect(restaurants.some((r) => !r.dish)).toBe(true);
   });
 
+  it('has at least one restaurant with a menu and one without (spec 004)', () => {
+    expect(restaurants.some((r) => r.menu?.length)).toBe(true);
+    expect(restaurants.some((r) => !r.menu?.length)).toBe(true);
+  });
+
   it('only has restaurants open at the targeted moment', () => {
     for (const r of restaurants) {
       expect(closingTimeAt(r.weeklyHours, STUB_DECK_INPUT.targetDateTime), r.name).not.toBeNull();

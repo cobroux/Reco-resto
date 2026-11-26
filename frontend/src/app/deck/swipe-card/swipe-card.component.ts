@@ -13,7 +13,9 @@ import { Restaurant } from '../../restaurant/restaurant';
 import { DECK_TEXTS } from '../deck.texts';
 import { formatDistance } from '../format/distance';
 import { closingTimeAt } from '../format/opening';
+import { weeklyHoursRows } from '../format/weekly-hours';
 import { prefersReducedMotion } from '../motion';
+import { RoutePreviewComponent } from './route-preview/route-preview.component';
 import { SWIPE_THRESHOLD_PX, SwipeDirection, classifySwipe, isDragging } from './swipe-gesture';
 
 type Direction = Exclude<SwipeDirection, 'none'>;
@@ -42,6 +44,7 @@ function leavingTransform(direction: Direction, dx: number, dy: number): string 
 /** Front of one deck card, draggable with mouse or finger (FR-003, FR-005). */
 @Component({
   selector: 'app-swipe-card',
+  imports: [RoutePreviewComponent],
   templateUrl: './swipe-card.component.html',
   styleUrl: './swipe-card.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -64,7 +67,14 @@ export class SwipeCardComponent {
     closingTimeAt(this.restaurant().weeklyHours, this.targetDateTime()),
   );
 
+  protected readonly flipped = signal(false);
+  protected readonly previewOpen = signal(false);
+  protected readonly hoursRows = computed(() =>
+    weeklyHoursRows(this.restaurant().weeklyHours, this.targetDateTime()),
+  );
+
   private start: { x: number; y: number } | null = null;
+  private tapStart: { x: number; y: number } | null = null;
   private readonly dx = signal(0);
   private readonly dy = signal(0);
   private readonly dragging = computed(() => isDragging(this.dx(), this.dy()));
@@ -108,9 +118,32 @@ export class SwipeCardComponent {
     return this.dragging() ? Math.max(0, Math.min(1, distance / SWIPE_THRESHOLD_PX)) : 0;
   }
 
+  /** Flips the card (the "↻" button, or a tap on the card). */
+  protected flip(): void {
+    if (this.leaving() || this.disabled()) {
+      return;
+    }
+    this.flipped.update((value) => !value);
+    this.previewOpen.set(false);
+  }
+
+  /** Shows the route preview inside the card; it is not a reaction (FR-006). */
+  protected openRoute(): void {
+    this.previewOpen.set(true);
+  }
+
   protected onPointerDown(event: PointerEvent): void {
     // Main button or a single finger only (no right click, no second finger).
     if (this.leaving() || this.disabled() || event.button !== 0 || event.isPrimary === false) {
+      return;
+    }
+    // Buttons handle their own click: they never start a drag or a tap.
+    if ((event.target as Element | null)?.closest?.('button, a')) {
+      return;
+    }
+    if (this.flipped()) {
+      // The back is never swiped (the content scrolls); a short press is a tap that flips it back.
+      this.tapStart = { x: event.clientX, y: event.clientY };
       return;
     }
     this.start = { x: event.clientX, y: event.clientY };
@@ -138,16 +171,38 @@ export class SwipeCardComponent {
     this.dy.set(event.clientY - this.start.y);
   }
 
-  protected onPointerUp(): void {
+  protected onPointerUp(event: PointerEvent): void {
+    if (this.tapStart) {
+      const moved = isDragging(event.clientX - this.tapStart.x, event.clientY - this.tapStart.y);
+      this.tapStart = null;
+      if (!moved) {
+        this.flip();
+      }
+      return;
+    }
     if (!this.start) {
       return;
     }
-    const direction = classifySwipe(this.dx(), this.dy());
+    const dx = this.dx();
+    const dy = this.dy();
+    const direction = classifySwipe(dx, dy);
     if (direction === 'none') {
       this.reset();
+      // A press that did not move is a tap: it flips the card (plan D-04-4).
+      if (!isDragging(dx, dy)) {
+        this.flip();
+      }
       return;
     }
     this.leave(direction);
+  }
+
+  /** The browser took the gesture (scroll inside the back): it is not a tap. */
+  protected onPointerCancel(): void {
+    this.tapStart = null;
+    if (this.start) {
+      this.reset();
+    }
   }
 
   private reset(): void {

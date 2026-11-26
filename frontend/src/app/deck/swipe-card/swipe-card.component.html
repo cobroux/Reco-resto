@@ -2,65 +2,152 @@
   class="card"
   [class.dragging]="transform() !== '' && !isLeaving()"
   [class.leaving]="isLeaving()"
+  [class.flipped]="flipped()"
   [style.transform]="transform()"
   [style.transition]="transition()"
   [attr.aria-label]="restaurant().name"
   (pointerdown)="onPointerDown($event)"
   (pointermove)="onPointerMove($event)"
-  (pointerup)="onPointerUp()"
-  (pointercancel)="onPointerUp()"
+  (pointerup)="onPointerUp($event)"
+  (pointercancel)="onPointerCancel()"
 >
-  <div class="hero">
-    @if (restaurant().photoUrl; as photo) {
-      <img class="photo" [src]="photo" alt="" draggable="false" />
-    } @else {
-      <div class="tablecloth" data-testid="tablecloth" aria-hidden="true"></div>
-    }
-    <span class="distance">{{ distance() }}</span>
-    <div class="stamp like" aria-hidden="true" [style.opacity]="likeOpacity()">
-      <span class="stamp-label"><span class="stamp-icon">♥</span>{{ texts.like }}</span>
-    </div>
-    <div class="stamp nope" aria-hidden="true" [style.opacity]="nopeOpacity()">
-      <span class="stamp-label"><span class="stamp-icon">✕</span>{{ texts.dislike }}</span>
-    </div>
-  </div>
+  @if (flipped()) {
+    <div class="back" data-testid="back">
+      <header class="back-head">
+        <div class="back-title">
+          <h2 class="back-name">{{ restaurant().name }}</h2>
+          <p class="back-meta">
+            {{ restaurant().cuisine }} · {{ distance() }}
+            @if (restaurant().priceLevel; as price) {
+              · {{ price }}
+            }
+          </p>
+        </div>
+        <button type="button" class="flip-btn" [attr.aria-label]="texts.flip" (click)="flip()">
+          <span aria-hidden="true">↻</span>
+        </button>
+      </header>
 
-  <div class="body">
-    <h2 class="name">{{ restaurant().name }}</h2>
-    @if (restaurant().address; as address) {
-      <p class="address" data-testid="address">{{ address }}</p>
-    }
-    <ul class="chips">
-      <li class="chip cuisine">{{ restaurant().cuisine }}</li>
-      @for (keyword of restaurant().keywords; track keyword) {
-        <li class="chip keyword">{{ keyword }}</li>
+      @if (restaurant().keywords.length) {
+        <ul class="back-tags">
+          @for (keyword of restaurant().keywords; track keyword) {
+            <li class="back-tag">{{ keyword }}</li>
+          }
+        </ul>
       }
-      @if (restaurant().priceLevel; as price) {
-        <li class="chip price">{{ price }}</li>
+
+      @if (hoursRows().length) {
+        <section class="section" data-testid="hours">
+          <h3 class="section-title">{{ texts.hours }}</h3>
+          @for (row of hoursRows(); track row.day) {
+            <div class="hours-row" [class.targeted]="row.targeted">
+              <span>{{ row.day }}</span>
+              <span>{{ row.ranges }}</span>
+            </div>
+          }
+        </section>
       }
-    </ul>
-    <div class="tiles">
-      <p class="tile open">
-        @if (closingTime(); as time) {
-          {{ texts.openUntil(time) }}
-        }
-      </p>
-      <p class="tile taste">
-        <span class="tile-label">{{ texts.toTaste }}</span>
-        @if (restaurant().dish; as dish) {
-          <span class="dish-name">{{ dish.name }}</span>
-        } @else {
-          <svg
-            data-testid="default-dish"
-            class="default-dish"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
+
+      @if (restaurant().address; as address) {
+        <section class="section" data-testid="back-address">
+          <h3 class="section-title">{{ texts.addressTitle }}</h3>
+          <p class="back-address">{{ address }}</p>
+          <button
+            type="button"
+            class="route-btn"
+            [attr.aria-expanded]="previewOpen()"
+            (click)="openRoute()"
           >
-            <circle cx="12" cy="12" r="7" />
-            <circle cx="12" cy="12" r="4" />
-          </svg>
-        }
-      </p>
+            {{ texts.route }}
+          </button>
+          @if (previewOpen()) {
+            <app-route-preview [restaurant]="restaurant()" />
+          }
+        </section>
+      }
+
+      @if (restaurant().menu?.length) {
+        <section class="section" data-testid="menu">
+          <h3 class="section-title">{{ texts.menu }}</h3>
+          @for (dish of restaurant().menu; track $index) {
+            <div class="dish">
+              <div class="dish-text">
+                <span class="dish-title">{{ dish.name }}</span>
+                @if (dish.description) {
+                  <span class="dish-desc">{{ dish.description }}</span>
+                }
+              </div>
+              @if (dish.price) {
+                <span class="dish-price">{{ dish.price }}</span>
+              }
+            </div>
+          }
+        </section>
+      }
     </div>
-  </div>
+  } @else {
+    <div class="hero">
+      @if (restaurant().photoUrl; as photo) {
+        <img class="photo" [src]="photo" alt="" draggable="false" />
+      } @else {
+        <div class="tablecloth" data-testid="tablecloth" aria-hidden="true"></div>
+      }
+      <span class="distance">{{ distance() }}</span>
+      <button
+        type="button"
+        class="flip-btn on-photo"
+        [attr.aria-label]="texts.flip"
+        (click)="flip()"
+      >
+        <span aria-hidden="true">↻</span>
+      </button>
+      <div class="stamp like" aria-hidden="true" [style.opacity]="likeOpacity()">
+        <span class="stamp-label"><span class="stamp-icon">♥</span>{{ texts.like }}</span>
+      </div>
+      <div class="stamp nope" aria-hidden="true" [style.opacity]="nopeOpacity()">
+        <span class="stamp-label"><span class="stamp-icon">✕</span>{{ texts.dislike }}</span>
+      </div>
+    </div>
+
+    <div class="body">
+      <h2 class="name">{{ restaurant().name }}</h2>
+      @if (restaurant().address; as address) {
+        <p class="address" data-testid="address">{{ address }}</p>
+      }
+      <ul class="chips">
+        <li class="chip cuisine">{{ restaurant().cuisine }}</li>
+        @for (keyword of restaurant().keywords; track keyword) {
+          <li class="chip keyword">{{ keyword }}</li>
+        }
+        @if (restaurant().priceLevel; as price) {
+          <li class="chip price">{{ price }}</li>
+        }
+      </ul>
+      <div class="tiles">
+        <p class="tile open">
+          @if (closingTime(); as time) {
+            <span class="tile-label">{{ texts.open }}</span>&ngsp;<span class="open-time">{{
+              texts.until(time)
+            }}</span>
+          }
+        </p>
+        <p class="tile taste">
+          <span class="tile-label">{{ texts.toTaste }}</span>
+          @if (restaurant().dish; as dish) {
+            <span class="dish-name">{{ dish.name }}</span>
+          } @else {
+            <svg
+              data-testid="default-dish"
+              class="default-dish"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="7" />
+              <circle cx="12" cy="12" r="4" />
+            </svg>
+          }
+        </p>
+      </div>
+    </div>
+  }
 </article>

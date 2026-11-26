@@ -177,6 +177,19 @@ describe('DeckStore', () => {
       expect(navigate).toHaveBeenLastCalledWith(['/deck']);
     });
 
+    it('keeps the same card and all reactions when coming back from a route opened from the preview (spec 004, SC-002)', () => {
+      setUp(5);
+      store.react('liked');
+      const before = session.reactions();
+
+      store.returnFromPick();
+      store.start();
+
+      expect(current()).toBe('r2');
+      expect(session.reactions()).toEqual(before);
+      expect(navigate).toHaveBeenLastCalledWith(['/deck']);
+    });
+
     it('treats a deck re-opened after a pick as a return from the route screen', () => {
       setUp(5);
       store.react('picked');

@@ -1,6 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { Restaurant } from '../../restaurant/restaurant';
 import { DECK_TEXTS } from '../deck.texts';
+import { RoutePreviewService } from '../route-preview.service';
+import { StubRoutePreviewService } from '../stub/stub-route-preview.service';
 import { SwipeDirection } from './swipe-gesture';
 import { SWIPE_ANIMATION_MS, SwipeCardComponent, animationDuration } from './swipe-card.component';
 
@@ -84,6 +87,8 @@ describe('SwipeCardComponent', () => {
 
     it('shows the opening status of the targeted moment', () => {
       expect(text()).toContain(DECK_TEXTS.openUntil('23:00'));
+      expect(root.querySelector('.open .tile-label')?.textContent).toBe(DECK_TEXTS.open);
+      expect(root.querySelector('.open .open-time')?.textContent).toBe(DECK_TEXTS.until('23:00'));
     });
 
     it('names a dish to taste', () => {
@@ -185,6 +190,222 @@ describe('SwipeCardComponent', () => {
       expect(swipes).toEqual([]);
     });
   });
+
+  describe('back of the card (spec 004)', () => {
+    const WITH_DETAILS: Restaurant = {
+      ...FULL,
+      address: '3 rue X, 75002 Paris',
+      menu: [
+        { name: 'Curry vert', description: 'Lait de coco', price: '14 €' },
+        { name: 'Riz parfumé' },
+      ],
+    };
+    const flipButton = () => root.querySelector('button.flip-btn') as HTMLButtonElement;
+    const back = () => root.querySelector('[data-testid="back"]');
+
+    async function flip(): Promise<void> {
+      flipButton().click();
+      await fixture.whenStable();
+    }
+
+    async function tap(): Promise<void> {
+      card().dispatchEvent(pointer('pointerdown', 100, 100));
+      card().dispatchEvent(pointer('pointerup', 100, 100));
+      await fixture.whenStable();
+    }
+
+    describe('flip (FR-001)', () => {
+      beforeEach(() => create(WITH_DETAILS));
+
+      it('shows the front first', () => {
+        expect(back()).toBeNull();
+        expect(root.querySelector('img.photo')).not.toBeNull();
+      });
+
+      it('shows the back with the "↻" button, and the front again with the same button', async () => {
+        await flip();
+        expect(back()).not.toBeNull();
+        expect(root.querySelector('img.photo')).toBeNull();
+
+        await flip();
+        expect(back()).toBeNull();
+        expect(root.querySelector('img.photo')).not.toBeNull();
+      });
+
+      it('flips in both directions with a tap on the card', async () => {
+        await tap();
+        expect(back()).not.toBeNull();
+
+        await tap();
+        expect(back()).toBeNull();
+      });
+
+      it('does not flip after a drag, even a short one that stays under the swipe threshold', async () => {
+        await drag(60, 0);
+
+        expect(back()).toBeNull();
+      });
+
+      it('does not flip and emits no reaction when the flip button is pressed', async () => {
+        flipButton().dispatchEvent(pointer('pointerdown', 100, 100));
+        flipButton().dispatchEvent(pointer('pointerup', 100, 100));
+        await fixture.whenStable();
+
+        expect(swipes).toEqual([]);
+      });
+
+      it('does not flip when disabled', async () => {
+        fixture.componentRef.setInput('disabled', true);
+        await fixture.whenStable();
+        await tap();
+
+        expect(back()).toBeNull();
+      });
+    });
+
+    describe('content (FR-002, FR-004)', () => {
+      beforeEach(async () => {
+        await create(WITH_DETAILS);
+        await flip();
+      });
+
+      it('shows name, cuisine, distance, price level and keywords', () => {
+        const head = root.querySelector('[data-testid="back"]')?.textContent ?? '';
+
+        expect(head).toContain('Baan Thaï');
+        expect(head).toContain('Thaïlandaise');
+        expect(head).toContain('1,1 km');
+        expect(head).toContain('€€');
+        expect(head).toContain('Options végé');
+        expect(head).toContain('Épicé');
+      });
+
+      it('lists the week with the targeted day highlighted', () => {
+        const rows = [...root.querySelectorAll('[data-testid="hours"] .hours-row')];
+
+        expect(rows).toHaveLength(7);
+        expect(root.querySelector('[data-testid="hours"]')?.textContent).toContain(
+          DECK_TEXTS.hours,
+        );
+        const targeted = rows.filter((row) => row.classList.contains('targeted'));
+        expect(targeted).toHaveLength(1);
+        expect(targeted[0].textContent).toContain('Vendredi');
+        expect(targeted[0].textContent).toContain('19:00 – 23:00');
+      });
+
+      it('shows the address and the "Itinéraire" button', () => {
+        const address = root.querySelector('[data-testid="back-address"]');
+
+        expect(address?.textContent).toContain(DECK_TEXTS.addressTitle);
+        expect(address?.textContent).toContain('3 rue X, 75002 Paris');
+        expect(address?.querySelector('button.route-btn')?.textContent).toContain(DECK_TEXTS.route);
+      });
+
+      it('lists the dishes with their description and price', () => {
+        const menu = root.querySelector('[data-testid="menu"]');
+        const dishes = [...(menu?.querySelectorAll('.dish') ?? [])];
+
+        expect(menu?.textContent).toContain(DECK_TEXTS.menu);
+        expect(dishes).toHaveLength(2);
+        expect(dishes[0].textContent).toContain('Curry vert');
+        expect(dishes[0].textContent).toContain('Lait de coco');
+        expect(dishes[0].textContent).toContain('14 €');
+        expect(dishes[1].textContent).toContain('Riz parfumé');
+      });
+    });
+
+    describe('missing data (FR-003, SC-001)', () => {
+      it('shows no "Menu" section without a menu, nor with an empty one', async () => {
+        await create({ ...WITH_DETAILS, menu: undefined });
+        await flip();
+        expect(root.querySelector('[data-testid="menu"]')).toBeNull();
+
+        await create({ ...WITH_DETAILS, menu: [] });
+        await flip();
+        expect(root.querySelector('[data-testid="menu"]')).toBeNull();
+      });
+
+      it('shows no "Horaires" section without opening hours', async () => {
+        await create({ ...WITH_DETAILS, weeklyHours: [[], [], [], [], [], [], []] });
+        await flip();
+
+        expect(root.querySelector('[data-testid="hours"]')).toBeNull();
+      });
+    });
+
+    describe('route preview (US2)', () => {
+      const previewEl = () => root.querySelector('[data-testid="route-preview"]');
+      const routeButton = () => root.querySelector('button.route-btn') as HTMLButtonElement;
+
+      beforeEach(async () => {
+        TestBed.configureTestingModule({
+          providers: [
+            provideRouter([]),
+            { provide: RoutePreviewService, useClass: StubRoutePreviewService },
+          ],
+        });
+        await create(WITH_DETAILS);
+        await flip();
+      });
+
+      it('shows no preview until "Itinéraire" is pressed', () => {
+        expect(previewEl()).toBeNull();
+      });
+
+      it('opens the preview inside the card, with the travel times (AS1)', async () => {
+        routeButton().click();
+        await fixture.whenStable();
+
+        expect(previewEl()).not.toBeNull();
+        expect(previewEl()?.textContent).toContain(DECK_TEXTS.travelModes.walk);
+        expect(root.querySelector('[data-testid="back"]')?.contains(previewEl())).toBe(true);
+      });
+
+      it('is not a reaction: no swipe is emitted and the card stays (FR-006, AS2)', async () => {
+        const lefts: SwipeDirection[] = [];
+        fixture.componentInstance.left.subscribe((d) => lefts.push(d));
+        routeButton().dispatchEvent(pointer('pointerdown', 100, 100));
+        routeButton().click();
+        routeButton().dispatchEvent(pointer('pointerup', 100, 100));
+        await fixture.whenStable();
+
+        expect(swipes).toEqual([]);
+        expect(lefts).toEqual([]);
+        expect(back()).not.toBeNull();
+      });
+
+      it('closes the preview when the card is flipped back', async () => {
+        routeButton().click();
+        await fixture.whenStable();
+        await flip();
+        await flip();
+
+        expect(previewEl()).toBeNull();
+      });
+    });
+
+    describe('gestures on the back (plan D-04-3)', () => {
+      beforeEach(async () => {
+        await create(WITH_DETAILS);
+        await flip();
+      });
+
+      it('does not swipe: scrolling inside the card must work', async () => {
+        await drag(150, 0);
+        await drag(0, -150);
+
+        expect(swipes).toEqual([]);
+        expect(back()).not.toBeNull();
+      });
+
+      it('still treats a move under the 6 px drag threshold as a tap (plan D-04-4)', async () => {
+        await drag(5, 0);
+
+        expect(back()).toBeNull();
+      });
+    });
+  });
+
   describe('leave animation (D18)', () => {
     let lefts: SwipeDirection[];
     const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

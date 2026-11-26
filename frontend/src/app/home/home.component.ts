@@ -1,9 +1,9 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { SearchResultStore } from '../search/search-result.store';
 import { SearchService } from '../search/search.service';
-import { DIET_TILES, HOME_TEXTS } from './home.texts';
+import { DIET_TILES, HOME_TEXTS, TITLE_ROTATION_MS } from './home.texts';
 
 @Component({
   selector: 'app-home',
@@ -27,6 +27,18 @@ export class HomeComponent {
   protected readonly emptyError = signal(false);
   /** True after a failed search (spec 003 FR-019, T5); reset when the user types or submits again. */
   protected readonly searchError = signal(false);
+
+  private readonly phraseIndex = signal(0);
+  /** Phrase shown after "Où manger," ; changes every {@link TITLE_ROTATION_MS}. */
+  protected readonly currentPhrase = computed(() => this.texts.titlePhrases[this.phraseIndex()]);
+
+  constructor() {
+    const timer = setInterval(
+      () => this.phraseIndex.update((index) => (index + 1) % this.texts.titlePhrases.length),
+      TITLE_ROTATION_MS,
+    );
+    inject(DestroyRef).onDestroy(() => clearInterval(timer));
+  }
 
   protected onInput(event: Event): void {
     this.sentence.set((event.target as HTMLInputElement).value);

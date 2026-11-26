@@ -1,5 +1,5 @@
 import { OpeningRange } from '../../restaurant/restaurant';
-import { closingTimeAt } from './opening';
+import { closingTimeAt, targetWeekday } from './opening';
 
 const lunchAndDinner: OpeningRange[] = [
   { open: '12:00', close: '14:30' },
@@ -10,6 +10,21 @@ const lunchAndDinner: OpeningRange[] = [
 function week(days: Record<number, OpeningRange[]>): OpeningRange[][] {
   return [0, 1, 2, 3, 4, 5, 6].map((d) => days[d] ?? []);
 }
+
+describe('targetWeekday (spec 004, FR-004)', () => {
+  it('returns the weekday of the local date as written, Sunday = 0', () => {
+    expect(targetWeekday('2026-11-27T13:00:00+01:00')).toBe(5);
+    expect(targetWeekday('2026-11-29T09:00')).toBe(0);
+  });
+
+  it('ignores the offset', () => {
+    expect(targetWeekday('2026-11-27T23:30:00-08:00')).toBe(5);
+  });
+
+  it('returns null for an invalid string', () => {
+    expect(targetWeekday('tonight')).toBeNull();
+  });
+});
 
 describe('closingTimeAt (D8)', () => {
   // 2026-11-27 is a Friday (5), 2026-11-28 a Saturday (6).

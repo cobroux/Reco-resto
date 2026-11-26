@@ -1,8 +1,20 @@
+const TITLE_START = 'Où manger,';
+const TITLE_END = '?';
+const TITLE_PHRASES = ['juste à côté', 'ce midi', 'ce soir', 'en terrasse'] as const;
+
+/** Delay between two title phrases (value given by the product owner: 5 seconds). */
+export const TITLE_ROTATION_MS = 5000;
+
 /** Single source of every user-facing text of the home screen (spec FR-001, FR-004, FR-007). */
 export const HOME_TEXTS = {
   logo: 'Nappe',
   badge: 'Restaurants autour de vous',
-  title: 'Où manger, juste à côté ?',
+  /** Accessible name of the heading; the visible phrase rotates (see `titlePhrases`). */
+  title: `${TITLE_START} ${TITLE_PHRASES[0]} ${TITLE_END}`,
+  titleStart: TITLE_START,
+  /** Phrases shown in turn after `titleStart` (wording to be validated by the product owner). */
+  titlePhrases: TITLE_PHRASES,
+  titleEnd: TITLE_END,
   subtitle: 'Trouvez un restaurant adapté à votre régime et à vos envies, en quelques secondes.',
   placeholder: 'Dites-nous ce qui vous ferait plaisir, et où',
   submit: 'Commencer',

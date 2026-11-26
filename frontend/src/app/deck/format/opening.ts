@@ -12,6 +12,20 @@ function endsAfterMidnight(range: OpeningRange): boolean {
 }
 
 /**
+ * Weekday (Sunday = 0) of the targeted moment, read from the local date as written in the ISO string
+ * (the offset is ignored), or null when the string is not a date-time. Single rule for the closing
+ * time and for the day highlighted in the opening hours (spec 004, FR-004).
+ */
+export function targetWeekday(targetDateTime: string): number | null {
+  const match = LOCAL_DATE_TIME.exec(targetDateTime);
+  if (!match) {
+    return null;
+  }
+  const [, year, month, day] = match.map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
+/**
  * Closing time ("HH:mm") of the opening range that contains the targeted moment, or null when the
  * restaurant is closed then. The local date and time are read as written in the ISO string (time of
  * the search place); the offset is ignored. `weeklyHours` is indexed Sunday = 0.
@@ -20,12 +34,12 @@ export function closingTimeAt(
   weeklyHours: readonly (readonly OpeningRange[])[],
   targetDateTime: string,
 ): string | null {
+  const weekday = targetWeekday(targetDateTime);
   const match = LOCAL_DATE_TIME.exec(targetDateTime);
-  if (!match) {
+  if (weekday === null || !match) {
     return null;
   }
-  const [, year, month, day, hour, minute] = match.map(Number);
-  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  const [, , , , hour, minute] = match.map(Number);
   const target = hour * 60 + minute;
 
   for (const range of weeklyHours[weekday] ?? []) {
