@@ -7,6 +7,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import ch.qos.logback.classic.Level;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -35,7 +37,7 @@ class LlmChatClientTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new LlmChatClient(builder, new LlmProperties("https://llm.test/v1/", "secret", "nova-lite", 10000, 2),
+        client = new LlmChatClient(builder, new LlmProperties("https://llm.test/v1/", "secret", "nova-lite", 10000, 2, 0.0),
                 JsonMapper.builder().build());
     }
 
@@ -57,6 +59,18 @@ class LlmChatClientTest {
         server.verify();
     }
 
+    /** Answers changed from one search to the next (2026-11-26): the configured temperature is sent. */
+    @Test
+    void theRequestAsksForTheConfiguredTemperature() {
+        server.expect(requestTo("https://llm.test/v1/chat/completions"))
+                .andExpect(jsonPath("$.temperature").value(0.0))
+                .andRespond(withSuccess(FINAL_REPLY, MediaType.APPLICATION_JSON));
+
+        client.complete("s", "u");
+
+        server.verify();
+    }
+
     @Test
     void theRequestAsksForTheConfiguredMaximumNumberOfOutputTokens() {
         server.expect(requestTo("https://llm.test/v1/chat/completions"))
@@ -73,9 +87,10 @@ class LlmChatClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer other = MockRestServiceServer.bindTo(builder).build();
         LlmChatClient noLimit = new LlmChatClient(builder,
-                new LlmProperties("https://llm.test/v1", "secret", "nova-lite", null, null), JsonMapper.builder().build());
+                new LlmProperties("https://llm.test/v1", "secret", "nova-lite", null, null, null), JsonMapper.builder().build());
         other.expect(requestTo("https://llm.test/v1/chat/completions"))
                 .andExpect(jsonPath("$.max_tokens").doesNotExist())
+                .andExpect(jsonPath("$.temperature").doesNotExist())
                 .andRespond(withSuccess(FINAL_REPLY, MediaType.APPLICATION_JSON));
 
         noLimit.complete("s", "u");
@@ -116,7 +131,7 @@ class LlmChatClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer other = MockRestServiceServer.bindTo(builder).build();
         LlmChatClient noRetry = new LlmChatClient(builder,
-                new LlmProperties("https://llm.test/v1", "secret", "nova-lite", null, null), JsonMapper.builder().build());
+                new LlmProperties("https://llm.test/v1", "secret", "nova-lite", null, null, null), JsonMapper.builder().build());
         other.expect(requestTo("https://llm.test/v1/chat/completions"))
                 .andRespond(withSuccess(EMPTY_REPLY, MediaType.APPLICATION_JSON));
 
@@ -126,15 +141,22 @@ class LlmChatClientTest {
     }
 
     @Test
-    void theFinishReasonAndTheTokensUsedAreLoggedAtDebugLevel() {
+    void theFinishReasonIsLoggedAtDebugLevelAndTheTokensUsedAtInfoLevel() {
         server.expect(requestTo("https://llm.test/v1/chat/completions")).andRespond(withSuccess(
                 "{\"choices\":[{\"finish_reason\":\"length\",\"message\":{\"role\":\"assistant\",\"content\":\"x\"}}],"
-                        + "\"usage\":{\"completion_tokens\":2000}}", MediaType.APPLICATION_JSON));
+                        + "\"usage\":{\"prompt_tokens\":1200,\"completion_tokens\":2000,\"total_tokens\":3200}}",
+                MediaType.APPLICATION_JSON));
 
-        List<String> messages = logsOf(Level.DEBUG, () -> client.complete("s", "u"));
+        List<String> debug = logsOf(Level.DEBUG, () -> client.complete("s", "u"));
 
-        assertThat(messages).anySatisfy(m -> assertThat(m).contains("finish_reason=length")
-                .contains("completion_tokens=2000"));
+        assertThat(debug).anySatisfy(m -> assertThat(m).contains("finish_reason=length"));
+        server.reset();
+        server.expect(requestTo("https://llm.test/v1/chat/completions")).andRespond(withSuccess(
+                "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"x\"}}],"
+                        + "\"usage\":{\"prompt_tokens\":1200,\"completion_tokens\":2000,\"total_tokens\":3200}}",
+                MediaType.APPLICATION_JSON));
+        List<String> info = logsOf(Level.INFO, () -> client.complete("s", "u"));
+        assertThat(info).anySatisfy(m -> assertThat(m).contains("LLM tokens: prompt 1200, completion 2000, total 3200"));
     }
 
     @Test
@@ -143,6 +165,35 @@ class LlmChatClientTest {
 
         assertThatThrownBy(() -> client.complete("s", "u")).isInstanceOfSatisfying(SearchException.class,
                 e -> assertThat(e.code()).isEqualTo(SearchErrorCode.SERVICE_UNAVAILABLE));
+    }
+
+    /** A refused request is logged at WARN with its HTTP status and the provider error code, never the key. */
+    @Test
+    void aRefusedRequestIsLoggedWithItsStatusAndErrorCode() {
+        server.expect(requestTo("https://llm.test/v1/chat/completions")).andRespond(
+                withStatus(HttpStatus.TOO_MANY_REQUESTS).contentType(MediaType.APPLICATION_JSON).body(
+                        "{\"error\":{\"message\":\"Rate limit reached for api_key: 0ec541babdd5c1c0707abd65c088a98556e0fee3ffe4dcd0a31c71e2f0bd76b7\",\"type\":\"requests\",\"code\":\"rate_limit_exceeded\"}}"));
+
+        List<String> messages = logsOf(Level.WARN, () -> assertThatThrownBy(() -> client.complete("s", "u"))
+                .isInstanceOf(SearchException.class));
+
+        assertThat(messages).anySatisfy(m -> assertThat(m).contains("LLM request failed").contains("HTTP 429")
+                .contains("rate_limit_exceeded").contains("Rate limit reached"));
+        assertThat(messages).noneSatisfy(m -> assertThat(m).contains("secret"));
+        assertThat(messages).noneSatisfy(m -> assertThat(m).contains("0ec541babdd5"));
+    }
+
+    /** A network failure is logged at WARN with its cause class. */
+    @Test
+    void aNetworkFailureIsLoggedWithItsCause() {
+        server.expect(requestTo("https://llm.test/v1/chat/completions")).andRespond(request -> {
+            throw new java.net.ConnectException("Connection refused");
+        });
+
+        List<String> messages = logsOf(Level.WARN, () -> assertThatThrownBy(() -> client.complete("s", "u"))
+                .isInstanceOf(SearchException.class));
+
+        assertThat(messages).anySatisfy(m -> assertThat(m).contains("LLM request failed").contains("ConnectException"));
     }
 
     @Test

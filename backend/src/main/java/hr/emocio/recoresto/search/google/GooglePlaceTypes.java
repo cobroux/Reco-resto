@@ -13,8 +13,6 @@ import java.util.TreeSet;
  * <ul>
  * <li>Restaurant check (D6): a place is a restaurant when its types contain {@code restaurant} or one of the
  * {@code *_restaurant} types.</li>
- * <li>Closed cuisine list (D7): every {@code *_restaurant} type of Google Table A; the language model picks from it,
- * the backend drops any other value.</li>
  * <li>Diet indicators (D8): the types and {@code servesVegetarianFood}, see {@link #statedDiets}.</li>
  * </ul>
  * Source of the list: https://developers.google.com/maps/documentation/places/web-service/place-types (Table A, "Food
@@ -25,7 +23,7 @@ public final class GooglePlaceTypes {
     /** The generic restaurant type. */
     public static final String RESTAURANT = "restaurant";
 
-    /** D7: every {@code *_restaurant} type of Table A, in the order of the page. */
+    /** D6: every {@code *_restaurant} type of Table A, in the order of the page. */
     public static final List<String> CUISINE_TYPES = List.of(
             "afghani_restaurant", "african_restaurant", "american_restaurant", "argentinian_restaurant",
             "asian_fusion_restaurant", "asian_restaurant", "australian_restaurant", "austrian_restaurant",
@@ -69,8 +67,6 @@ public final class GooglePlaceTypes {
             "vegan", "vegan_restaurant",
             "halal", "halal_restaurant");
 
-    private static final Set<String> CUISINES = Set.copyOf(CUISINE_TYPES);
-
     private GooglePlaceTypes() {
     }
 
@@ -106,10 +102,5 @@ public final class GooglePlaceTypes {
             });
         }
         return List.copyOf(diets);
-    }
-
-    /** D7: whether a value is in the closed cuisine list. */
-    public static boolean isCuisine(String value) {
-        return value != null && CUISINES.contains(value);
     }
 }

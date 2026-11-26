@@ -12,7 +12,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *        "service unavailable"); never logged, see {@link #toString()}
  * @param timeoutSeconds connect and read timeout of one Google request
  * @param retryDelaysSeconds waits before each new attempt after a transient failure; empty means a single attempt
- * @param maxResults places asked for per Nearby Search (1-20)
+ * @param maxResults places asked for per restaurant search, one page of Text Search (1-20)
  * @param photoMaxWidthPx width of the photos fetched for the cards
  * @param languageCode language of the Google answers
  * @param regionCode region of the Google answers

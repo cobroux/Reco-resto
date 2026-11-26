@@ -32,7 +32,7 @@ class SearchControllerTest {
     @MockitoBean
     private SearchService service;
 
-    private final SearchCriteria criteria = new SearchCriteria(List.of("asian"), List.of("vegetarian"), null,
+    private final SearchCriteria criteria = new SearchCriteria("asiatique", List.of("vegetarian"),
             List.of("Opéra, Paris"), "now", null, null);
 
     @Test
@@ -43,7 +43,10 @@ class SearchControllerTest {
         mockMvc.perform(post("/api/search").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sentence\":\"asiatique près d'Opéra\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.criteria.cuisines[0]").value("asian"))
+                .andExpect(jsonPath("$.criteria.query").value("asiatique"))
+                .andExpect(jsonPath("$.criteria.cuisines").isArray())
+                .andExpect(jsonPath("$.criteria.cuisines").isEmpty())
+                .andExpect(jsonPath("$.criteria.diets[0]").value("vegetarian"))
                 .andExpect(jsonPath("$.criteria.moment").value("now"))
                 .andExpect(jsonPath("$.deck[0].name").value("Thai"))
                 .andExpect(jsonPath("$.deck[0].address").value("1 rue Thai"))

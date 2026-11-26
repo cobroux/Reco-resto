@@ -21,6 +21,7 @@ import hr.emocio.recoresto.search.api.SearchErrorCode;
 import hr.emocio.recoresto.search.api.SearchException;
 import hr.emocio.recoresto.search.api.SearchRequest;
 import hr.emocio.recoresto.search.config.LlmProperties;
+import hr.emocio.recoresto.search.config.ChainProperties;
 import hr.emocio.recoresto.search.config.SearchProperties;
 import hr.emocio.recoresto.search.criteria.CriteriaMatcher;
 import hr.emocio.recoresto.search.criteria.MomentResolver;
@@ -62,7 +63,8 @@ class SearchServiceTest {
 
     private SearchService serviceWith(SentenceInterpreter sentenceInterpreter) {
         return new SearchService(sentenceInterpreter, locator, new MomentResolver(clock), source,
-                new RestaurantFilters(new CriteriaMatcher()), new DeckSelector(), new SearchProperties(2.5, 15, 5));
+                new RestaurantFilters(new CriteriaMatcher()), new DeckSelector(new ChainProperties(null, null)),
+                new SearchProperties(2.5, 15, 5));
     }
 
     private final Position opera = new Position(48.8708, 2.3322);
@@ -71,11 +73,11 @@ class SearchServiceTest {
     private final SearchRequest request = new SearchRequest("asiatique près d'Opéra", null);
 
     private SearchCriteria criteria(String moment, Integer distanceLimitMeters) {
-        return new SearchCriteria(null, null, null, List.of("Opéra"), moment, distanceLimitMeters, null);
+        return new SearchCriteria(null, null, List.of("Opéra"), moment, distanceLimitMeters, null);
     }
 
     private SearchCriteria criteriaWalking(Integer walkingMinutes, Integer distanceLimitMeters) {
-        return new SearchCriteria(null, null, null, List.of("Opéra"), "now", distanceLimitMeters, walkingMinutes);
+        return new SearchCriteria(null, null, List.of("Opéra"), "now", distanceLimitMeters, walkingMinutes);
     }
 
     private static SearchAnswer understood(SearchCriteria criteria, NamedPlace... places) {
@@ -349,7 +351,7 @@ class SearchServiceTest {
         when(llm.complete(any(), any())).thenReturn(recorded, repaired);
         JsonMapper json = JsonMapper.builder().build();
         SentenceInterpreter recordedInterpreter = new SentenceInterpreter(llm, new SearchAnswerParser(json),
-                new LlmProperties("https://llm.test/v1", "k", "m", null, 2), clock);
+                new LlmProperties("https://llm.test/v1", "k", "m", null, 2, null), clock);
         when(locator.locate(any())).thenReturn(opera);
         sourceFinds(restaurants("r", 3));
 
@@ -435,5 +437,19 @@ class SearchServiceTest {
                 .noneSatisfy(m -> assertThat(m).contains("asiatique près d'Opéra"));
         assertThat(logsOf(() -> service.search(request, false), Level.DEBUG))
                 .anySatisfy(m -> assertThat(m).contains("asiatique près d'Opéra"));
+    }
+
+    /** Text Search experiment: the query is logged by its length at INFO, its text only at DEBUG. */
+    @Test
+    void theQueryIsLoggedByItsLengthAtInfoAndItsTextOnlyAtDebug() {
+        SearchCriteria aligot = new SearchCriteria("aligot aux truffes", null, List.of("Opéra"), "now", null, null);
+        interpreterAnswers(understood(aligot, atOpera()));
+        sourceFinds(restaurants("r", 1));
+
+        List<String> info = logsOf(() -> service.search(request, false), Level.INFO);
+        assertThat(info).anySatisfy(m -> assertThat(m).contains("query of 18 characters"));
+        assertThat(info).noneSatisfy(m -> assertThat(m).contains("aligot"));
+        assertThat(logsOf(() -> service.search(request, false), Level.DEBUG))
+                .anySatisfy(m -> assertThat(m).contains("aligot aux truffes"));
     }
 }

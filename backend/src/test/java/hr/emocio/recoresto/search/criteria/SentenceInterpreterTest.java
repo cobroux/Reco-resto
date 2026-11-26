@@ -10,7 +10,6 @@ import hr.emocio.recoresto.search.api.Position;
 import hr.emocio.recoresto.search.api.SearchErrorCode;
 import hr.emocio.recoresto.search.api.SearchException;
 import hr.emocio.recoresto.search.config.LlmProperties;
-import hr.emocio.recoresto.search.google.GooglePlaceTypes;
 import hr.emocio.recoresto.search.llm.LlmChatClient;
 import hr.emocio.recoresto.search.restaurant.NamedPlace;
 import hr.emocio.recoresto.search.restaurant.SearchAnswer;
@@ -27,7 +26,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Spec 008 T3, T4, T8, T20 (happy path); FR-002; implementation decision Q3. */
+/** Spec 008 T3, T4, T8, T20 (happy path); FR-002; Text Search experiment of 2026-11-26 (the model writes a query). */
 class SentenceInterpreterTest {
 
     private static final String URL = "https://llm.test/v1/chat/completions";
@@ -41,7 +40,7 @@ class SentenceInterpreterTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        LlmProperties properties = new LlmProperties("https://llm.test/v1", "secret", "nova-lite", 10000, 2);
+        LlmProperties properties = new LlmProperties("https://llm.test/v1", "secret", "nova-lite", 10000, 2, 0.0);
         LlmChatClient llm = new LlmChatClient(builder, properties, json);
         interpreter = new SentenceInterpreter(llm, new SearchAnswerParser(json), properties,
                 Clock.fixed(Instant.parse("2026-11-24T10:00:00Z"), ZoneOffset.UTC));
@@ -59,23 +58,18 @@ class SentenceInterpreterTest {
 
     private static final String ASIAN_OR_VEGETARIAN = """
             {"understood":true,"outsideFrance":false,
-             "criteria":{"cuisines":["asian_restaurant","chinese_restaurant"],"diets":["vegetarian"],
-               "combination":{"operator":"OR","children":[
-                 {"operator":"OR","children":[{"kind":"cuisine","value":"asian_restaurant"},
-                                              {"kind":"cuisine","value":"chinese_restaurant"}]},
-                 {"kind":"diet","value":"vegetarian"}]},
-               "places":["Opéra, Paris"],"moment":"now"},
+             "criteria":{"query":"asiatique ou végétarien","places":["Opéra, Paris"],"moment":"now"},
              "centers":[{"name":"Opéra, Paris","latitude":48.8708,"longitude":2.3322}]}""";
 
-    /** FR-002, R8: one call, no tools, a prompt without any data-source query language. */
+    /** FR-002, R8: one call, no tools, a prompt without any data-source query language nor type list. */
     @Test
-    void oneCallWithoutToolsWithThePromptOfTheClosedCuisineList() {
+    void oneCallWithoutToolsWithAPromptAskingForAQuery() {
         server.expect(requestTo(URL))
                 .andExpect(jsonPath("$.tools").doesNotExist())
                 .andExpect(jsonPath("$.messages.length()").value(2))
                 .andExpect(jsonPath("$.messages[1].content").value(SENTENCE))
                 .andExpect(jsonPath("$.messages[0].content").value(Matchers.allOf(
-                        Matchers.containsString("asian_restaurant"), Matchers.containsString("yakitori_restaurant"),
+                        Matchers.containsString("\"query\""),
                         Matchers.containsString("2026-11-24T11:00"),
                         Matchers.not(Matchers.containsStringIgnoringCase("overpass")),
                         Matchers.not(Matchers.containsStringIgnoringCase("openstreetmap")),
@@ -87,12 +81,60 @@ class SentenceInterpreterTest {
         server.verify();
     }
 
+    /** Text Search experiment (2026-11-26): the model no longer picks Google types from a closed list. */
     @Test
-    void theSystemPromptListsEveryCuisineOfTheClosedList() {
-        assertThat(interpreter.systemPrompt()).contains(GooglePlaceTypes.CUISINE_TYPES);
+    void thePromptHasNoGoogleTypeList() {
+        assertThat(interpreter.systemPrompt()).doesNotContain("_restaurant").doesNotContain("Google place types")
+                .doesNotContain("\"cuisines\"").doesNotContain("\"combination\"");
     }
 
-    /** T3: the criteria and places as understood, AND/OR kept. */
+    /** The model writes a short French text of what to eat, with the words of the user. */
+    @Test
+    void thePromptAsksForAShortFrenchQueryKeepingTheWordsOfTheUser() {
+        assertThat(interpreter.systemPrompt()).contains("\"query\": a short French search text")
+                .contains("with the words of the user").contains("\"restaurant\" when the sentence says nothing");
+    }
+
+    /** "asiatique ou végétarien" is an alternative: it stays in the query, only a required diet is a diet. */
+    @Test
+    void thePromptSaysOnlyARequiredDietIsADiet() {
+        assertThat(interpreter.systemPrompt()).contains("only the diets the user requires")
+                .contains("a taste, a price, takeaway or an alternative")
+                .contains("is never a diet");
+    }
+
+    /** The prompt stays short (it was about 1 400 tokens with the 115 types). */
+    @Test
+    void thePromptIsShort() {
+        assertThat(interpreter.systemPrompt().length()).isLessThan(2600);
+    }
+
+    /** Answers seen on 2026-11-26: "ce midi" given as "now". */
+    @Test
+    void thePromptSaysANamedMomentIsADateTime() {
+        assertThat(interpreter.systemPrompt()).contains("\"moment\" is the local").contains("never \"now\"");
+    }
+
+    /** Answer seen on 2026-11-26: "manger pas cher" read as not a request (spec 002: a budget is ignored). */
+    @Test
+    void thePromptSaysASentenceAboutEatingIsARequestEvenWithOnlyABudget() {
+        assertThat(interpreter.systemPrompt()).contains("\"understood\" is false only when the sentence is not about")
+                .contains("with only a budget or a dish, is a request");
+    }
+
+    /** A cuisine word ("Italien", "chinois") is not a place: the model is told to give no center for it. */
+    @Test
+    void thePromptSaysACuisineWordIsNeverAPlace() {
+        assertThat(interpreter.systemPrompt()).contains("A cuisine, dish or nationality word")
+                .contains("is never a place");
+    }
+
+    @Test
+    void thePromptSaysNeverNull() {
+        assertThat(interpreter.systemPrompt()).contains("Never write null or an empty value");
+    }
+
+    /** T3: the query and places as understood. */
     @Test
     void theUnderstoodCriteriaAndPlacesAreReturned() {
         modelAnswers(ASIAN_OR_VEGETARIAN);
@@ -100,25 +142,36 @@ class SentenceInterpreterTest {
         SearchAnswer answer = interpreter.interpret(SENTENCE);
 
         assertThat(answer.state()).isEqualTo(SearchAnswer.State.UNDERSTOOD);
-        assertThat(answer.criteria().combination().operator()).isEqualTo("OR");
-        assertThat(answer.criteria().diets()).containsExactly("vegetarian");
+        assertThat(answer.criteria().query()).isEqualTo("asiatique ou végétarien");
+        assertThat(answer.criteria().diets()).isEmpty();
         assertThat(answer.places()).containsExactly(new NamedPlace("Opéra, Paris", new Position(48.8708, 2.3322)));
     }
 
-    /** T4: a query or filters written by the model are ignored; only the criteria are read. */
+    /** "frites": the dish is passed through, never repaired nor turned into a type. */
     @Test
-    void aQueryOrFiltersWrittenByTheModelAreIgnored() {
+    void aDishQueryIsReturnedAsItIsWithoutRepair() {
         modelAnswers("""
-                {"understood":true,"query":"[out:json];nwr[amenity=restaurant];out;",
+                {"understood":true,"criteria":{"query":"frites"},
+                 "centers":[{"name":"Opéra","latitude":48.8708,"longitude":2.3322}]}""");
+
+        assertThat(interpreter.interpret("des frites à Opéra").criteria().query()).isEqualTo("frites");
+        server.verify();
+    }
+
+    /** T4: an Overpass query or filters written by the model are ignored; only the criteria are read. */
+    @Test
+    void filtersWrittenByTheModelAreIgnored() {
+        modelAnswers("""
+                {"understood":true,
                  "tags":[{"key":"cuisine","regex":"thai"}],"includedTypes":["bar"],
-                 "criteria":{"cuisines":["thai_restaurant"],"places":["Opéra"],"filters":["name~x"]},
+                 "criteria":{"query":"thaï","places":["Opéra"],"filters":["name~x"],"cuisines":["bar"]},
                  "centers":[{"name":"Opéra","latitude":48.8708,"longitude":2.3322}]}""");
 
         SearchAnswer answer = interpreter.interpret("un thaï à Opéra");
 
         assertThat(answer.state()).isEqualTo(SearchAnswer.State.UNDERSTOOD);
-        assertThat(answer.criteria()).isEqualTo(new SearchCriteria(List.of("thai_restaurant"), List.of(), null,
-                List.of("Opéra"), null, null, null));
+        assertThat(answer.criteria()).isEqualTo(new SearchCriteria("thaï", List.of(), List.of("Opéra"), null, null,
+                null));
     }
 
     /** T8. */
@@ -138,38 +191,10 @@ class SentenceInterpreterTest {
         assertThat(interpreter.interpret("blablabla").state()).isEqualTo(SearchAnswer.State.NOT_A_REQUEST);
     }
 
-    /** Q3: a cuisine outside the closed list never widens the search; it ends in "no result". */
-    @Test
-    void aCuisineOutsideTheClosedListThatStaysInvalidAfterTheRepairsGivesNoResult() {
-        for (int i = 0; i < 3; i++) { // the first answer and 2 repairs (llm.empty-answer-retries)
-            modelAnswers("""
-                    {"understood":true,"criteria":{"cuisines":["asian"],"places":["Opéra"]},
-                     "centers":[{"name":"Opéra","latitude":48.8708,"longitude":2.3322}]}""");
-        }
-
-        assertThatThrownBy(() -> interpreter.interpret("asiatique à Opéra")).isInstanceOfSatisfying(
-                SearchException.class, e -> assertThat(e.code()).isEqualTo(SearchErrorCode.NO_RESULT));
-        server.verify();
-    }
-
-    @Test
-    void aCuisineOutsideTheClosedListInTheTreeAlsoGivesNoResult() {
-        for (int i = 0; i < 3; i++) {
-            modelAnswers("""
-                {"understood":true,"criteria":{"cuisines":["thai_restaurant"],
-                  "combination":{"operator":"OR","children":[{"kind":"cuisine","value":"thai_restaurant"},
-                                                              {"kind":"cuisine","value":"bistro"}]}},
-                 "centers":[{"name":"Opéra","latitude":48.8708,"longitude":2.3322}]}""");
-        }
-
-        assertThatThrownBy(() -> interpreter.interpret("thaï ou bistrot à Opéra")).isInstanceOfSatisfying(
-                SearchException.class, e -> assertThat(e.code()).isEqualTo(SearchErrorCode.NO_RESULT));
-    }
-
     // --- Repair of an unusable answer (T045: T18, T19, D11, Q3) ---
 
     private static final String VALID = """
-            {"understood":true,"criteria":{"cuisines":["thai_restaurant"],"places":["Opéra"]},
+            {"understood":true,"criteria":{"query":"thaï","places":["Opéra"]},
              "centers":[{"name":"Opéra","latitude":48.8708,"longitude":2.3322}]}""";
 
     private static final String BROKEN = "{\"understood\":true,\"criteria\":{\"places\":[\"Opéra\"]";
@@ -188,7 +213,7 @@ class SentenceInterpreterTest {
         SearchAnswer answer = interpreter.interpret("un thaï à Opéra");
 
         assertThat(answer.state()).isEqualTo(SearchAnswer.State.UNDERSTOOD);
-        assertThat(answer.criteria().cuisines()).containsExactly("thai_restaurant");
+        assertThat(answer.criteria().query()).isEqualTo("thaï");
         server.verify();
     }
 
@@ -201,32 +226,6 @@ class SentenceInterpreterTest {
 
         assertThatThrownBy(() -> interpreter.interpret("un thaï à Opéra")).isInstanceOfSatisfying(
                 SearchException.class, e -> assertThat(e.code()).isEqualTo(SearchErrorCode.SERVICE_UNAVAILABLE));
-        server.verify();
-    }
-
-    /** Q3: a cuisine outside the closed list is repaired the same way. */
-    @Test
-    void aCuisineOutsideTheClosedListIsRepaired() {
-        modelAnswers("""
-                {"understood":true,"criteria":{"cuisines":["thai"],"places":["Opéra"]},
-                 "centers":[{"name":"Opéra","latitude":48.8708,"longitude":2.3322}]}""");
-        server.expect(requestTo(URL))
-                .andExpect(jsonPath("$.messages[1].content").value(Matchers.allOf(
-                        Matchers.containsString("thai"), Matchers.containsString("outside the list"))))
-                .andRespond(withSuccess(reply(VALID), MediaType.APPLICATION_JSON));
-
-        assertThat(interpreter.interpret("un thaï à Opéra").criteria().cuisines()).containsExactly("thai_restaurant");
-        server.verify();
-    }
-
-    /** The repairs are counted once for the sentence, whatever made the answer unusable. */
-    @Test
-    void theRepairsAreCountedTogether() {
-        modelAnswers(BROKEN);
-        modelAnswers("{\"understood\":true,\"criteria\":{\"cuisines\":[\"thai\"]}}");
-        modelAnswers(BROKEN);
-
-        assertThatThrownBy(() -> interpreter.interpret("un thaï à Opéra")).isInstanceOf(SearchException.class);
         server.verify();
     }
 

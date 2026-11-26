@@ -25,9 +25,9 @@ class GooglePlaceTypesTest {
         assertThat(GooglePlaceTypes.isRestaurant(null)).isFalse();
     }
 
-    /** D7: the closed list is every {@code *_restaurant} type of Google Table A (115 on 2026-11-25, research R3). */
+    /** D6: every {@code *_restaurant} type of Google Table A (115 on 2026-11-25, research R3). */
     @Test
-    void theClosedCuisineListIsEveryRestaurantSubtypeOfTableA() {
+    void theCuisineTypesAreEveryRestaurantSubtypeOfTableA() {
         assertThat(GooglePlaceTypes.CUISINE_TYPES).hasSize(115).doesNotHaveDuplicates()
                 .allSatisfy(type -> assertThat(type).endsWith("_restaurant"))
                 .doesNotContain("restaurant")
@@ -35,13 +35,9 @@ class GooglePlaceTypesTest {
                         "japanese_restaurant", "thai_restaurant", "vietnamese_restaurant", "korean_restaurant",
                         "indian_restaurant", "french_restaurant", "pizza_restaurant", "sushi_restaurant",
                         "ramen_restaurant", "fast_food_restaurant", "fine_dining_restaurant", "yakitori_restaurant");
-        assertThat(GooglePlaceTypes.isCuisine("italian_restaurant")).isTrue();
-        assertThat(GooglePlaceTypes.isCuisine("italian")).isFalse();
-        assertThat(GooglePlaceTypes.isCuisine("cafe")).isFalse();
-        assertThat(GooglePlaceTypes.isCuisine(null)).isFalse();
     }
 
-    /** The restaurant types are {@code restaurant} plus the closed cuisine list (single table). */
+    /** The restaurant types are {@code restaurant} plus the cuisine types (single table). */
     @Test
     void theRestaurantTypesAreRestaurantAndTheCuisineTypes() {
         assertThat(GooglePlaceTypes.RESTAURANT_TYPES).hasSize(116).contains("restaurant")

@@ -6,7 +6,6 @@ import static hr.emocio.recoresto.search.restaurant.TestRestaurants.of;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import hr.emocio.recoresto.search.criteria.CriteriaMatcher;
-import hr.emocio.recoresto.search.criteria.CriteriaNode;
 import hr.emocio.recoresto.search.criteria.SearchCriteria;
 import hr.emocio.recoresto.search.google.GooglePlace;
 import java.time.ZoneId;
@@ -22,7 +21,7 @@ class RestaurantFiltersTest {
     /** A Saturday. */
     private static final ZonedDateTime SATURDAY_NOON = ZonedDateTime.of(2026, 11, 28, 12, 0, 0, 0, PARIS);
 
-    private static final SearchCriteria NO_CRITERIA = new SearchCriteria(null, null, null, null, null, null, null);
+    private static final SearchCriteria NO_CRITERIA = new SearchCriteria(null, null, null, null, null, null);
 
     private final RestaurantFilters filters = new RestaurantFilters(new CriteriaMatcher());
 
@@ -158,15 +157,15 @@ class RestaurantFiltersTest {
                 .containsExactly("restaurant", "thai");
     }
 
-    /** 008 T5: places failing the AND/OR criteria are excluded. */
+    /** 008 D8: a diet the user requires is still filtered on what Google states. */
     @Test
-    void placesNotMatchingTheCriteriaAreExcluded() {
-        SearchCriteria italian = new SearchCriteria(null, null, new CriteriaNode(null, "cuisine",
-                "italian_restaurant", null), null, null, null, null);
-        List<GooglePlace> places = List.of(place(at("italian", 100), "OPERATIONAL", "italian_restaurant",
-                "restaurant"), place(at("thai", 100), "OPERATIONAL", "thai_restaurant", "restaurant"));
+    void placesNotStatingARequiredDietAreExcluded() {
+        SearchCriteria vegan = new SearchCriteria("pizza", List.of("vegan"), null, null, null, null);
+        List<GooglePlace> places = List.of(place(at("vegan", 100), "OPERATIONAL", "pizza_restaurant",
+                "vegan_restaurant", "restaurant"), place(at("other", 100), "OPERATIONAL", "pizza_restaurant",
+                "restaurant"));
 
-        assertThat(names(filters.apply(places, italian, 2500, SATURDAY_NOON))).containsExactly("italian");
+        assertThat(names(filters.apply(places, vegan, 2500, SATURDAY_NOON))).containsExactly("vegan");
     }
 
     /** 008 T10, T23 and SC-005 on Google places: address, radius and unknown hours rules unchanged. */

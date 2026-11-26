@@ -8,7 +8,7 @@ import java.util.List;
  * never part of the response, which only carries {@link #restaurant()}.
  *
  * @param id Google place identifier ({@code id}), the deduplication key
- * @param types Google {@code types}: restaurant check (D6), cuisine match (D7), diet indicators (D8)
+ * @param types Google {@code types}: restaurant check (D6), diet indicators (D8)
  * @param primaryType Google {@code primaryType}
  * @param businessStatus Google {@code businessStatus}, null when absent (D9 (3))
  * @param servesVegetarianFood Google {@code servesVegetarianFood}: true, false or null when absent (D8)

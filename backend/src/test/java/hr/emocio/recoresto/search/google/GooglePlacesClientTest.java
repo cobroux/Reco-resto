@@ -38,7 +38,7 @@ import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Spec 008 T1, T38, T39; contracts/google-places-requests.md "Restaurant search" (Nearby Search, D3). */
+/** Spec 008 T1, T38, T39; restaurant search by Text Search (experiment of 2026-11-26, replacing D3 Nearby Search). */
 class GooglePlacesClientTest {
 
     private static final String BASE = "https://places.test/v1";
@@ -61,28 +61,39 @@ class GooglePlacesClientTest {
                 "fr", "FR", fixtureFile), JsonMapper.builder().build(), waits::add);
     }
 
+    /**
+     * Text Search experiment (2026-11-26): one request per point, the text of the model, only restaurants, the
+     * rectangle holding the search circle (Text Search restricts to a rectangle only), one page of max-results.
+     */
     @Test
-    void searchNearbySendsTheBuiltRequestWithTheKeyInAHeaderOnly() {
+    void searchTextSendsTheBuiltRequestWithTheKeyInAHeaderOnly() {
         GooglePlacesClient client = client(null);
-        server.expect(requestTo(BASE + "/places:searchNearby"))
+        server.expect(requestTo(BASE + "/places:searchText"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("X-Goog-Api-Key", KEY))
                 .andExpect(header("X-Goog-FieldMask", GooglePlacesClient.SEARCH_FIELD_MASK))
                 .andExpect(requestTo(Matchers.not(Matchers.containsString(KEY))))
-                .andExpect(jsonPath("$.includedTypes[0]").value("italian_restaurant"))
-                .andExpect(jsonPath("$.includedTypes[1]").value("pizza_restaurant"))
-                .andExpect(jsonPath("$.maxResultCount").value(20))
-                .andExpect(jsonPath("$.locationRestriction.circle.center.latitude").value(48.8708))
-                .andExpect(jsonPath("$.locationRestriction.circle.center.longitude").value(2.3322))
-                .andExpect(jsonPath("$.locationRestriction.circle.radius").value(2500.0))
+                .andExpect(jsonPath("$.textQuery").value("frites"))
+                .andExpect(jsonPath("$.includedType").value("restaurant"))
+                .andExpect(jsonPath("$.strictTypeFiltering").value(true))
+                .andExpect(jsonPath("$.pageSize").value(20))
+                .andExpect(jsonPath("$.locationRestriction.rectangle.low.latitude").value(Matchers.closeTo(48.848317, 1e-6)))
+                .andExpect(jsonPath("$.locationRestriction.rectangle.low.longitude").value(Matchers.closeTo(2.298019, 1e-6)))
+                .andExpect(jsonPath("$.locationRestriction.rectangle.high.latitude").value(Matchers.closeTo(48.893283, 1e-6)))
+                .andExpect(jsonPath("$.locationRestriction.rectangle.high.longitude").value(Matchers.closeTo(2.366381, 1e-6)))
+                .andExpect(jsonPath("$.locationRestriction.circle").doesNotExist())
+                .andExpect(jsonPath("$.includedTypes").doesNotExist())
+                .andExpect(jsonPath("$.maxResultCount").doesNotExist())
+                .andExpect(jsonPath("$.pageToken").doesNotExist())
                 .andExpect(jsonPath("$.languageCode").value("fr"))
                 .andExpect(jsonPath("$.regionCode").value("FR"))
-                .andRespond(withSuccess("{\"places\":[{\"id\":\"a\"},{\"id\":\"b\"}]}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"places\":[{\"id\":\"a\"},{\"id\":\"b\"}],\"nextPageToken\":\"t\"}",
+                        MediaType.APPLICATION_JSON));
 
-        List<JsonNode> places = client.searchNearby(List.of("italian_restaurant", "pizza_restaurant"), OPERA, 2500);
+        List<JsonNode> places = client.searchText("frites", OPERA, 2500);
 
         assertThat(places).extracting(place -> place.path("id").asString()).containsExactly("a", "b");
-        server.verify();
+        server.verify(); // one request only: the next page is never asked for
     }
 
     /** FR-008, D21 (2) and (3): the single list of the Google fields used. */
@@ -98,27 +109,27 @@ class GooglePlacesClientTest {
     @Test
     void anAnswerWithoutPlacesIsAnEmptyList() {
         GooglePlacesClient client = client(null);
-        server.expect(requestTo(BASE + "/places:searchNearby"))
+        server.expect(requestTo(BASE + "/places:searchText"))
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
-        assertThat(client.searchNearby(List.of("restaurant"), OPERA, 2500)).isEmpty();
+        assertThat(client.searchText("restaurant", OPERA, 2500)).isEmpty();
     }
 
     @Test
     void aClientErrorIsServiceUnavailable() {
         GooglePlacesClient client = client(null);
-        server.expect(requestTo(BASE + "/places:searchNearby")).andRespond(withStatus(HttpStatus.FORBIDDEN));
+        server.expect(requestTo(BASE + "/places:searchText")).andRespond(withStatus(HttpStatus.FORBIDDEN));
 
-        assertUnavailable(() -> client.searchNearby(List.of("restaurant"), OPERA, 2500));
+        assertUnavailable(() -> client.searchText("restaurant", OPERA, 2500));
     }
 
     @Test
     void anUnreadableAnswerIsServiceUnavailable() {
         GooglePlacesClient client = client(null);
-        server.expect(requestTo(BASE + "/places:searchNearby"))
+        server.expect(requestTo(BASE + "/places:searchText"))
                 .andRespond(withSuccess("{not json", MediaType.APPLICATION_JSON));
 
-        assertUnavailable(() -> client.searchNearby(List.of("restaurant"), OPERA, 2500));
+        assertUnavailable(() -> client.searchText("restaurant", OPERA, 2500));
     }
 
     @Test
@@ -126,7 +137,7 @@ class GooglePlacesClientTest {
         Path fixture = Files.writeString(dir.resolve("fixture.json"), "{\"places\":[{\"id\":\"fixture-1\"}]}");
         GooglePlacesClient client = client(fixture.toString());
 
-        assertThat(client.searchNearby(List.of("restaurant"), OPERA, 2500))
+        assertThat(client.searchText("restaurant", OPERA, 2500))
                 .extracting(place -> place.path("id").asString()).containsExactly("fixture-1");
         server.verify(); // no request was expected, none was made
     }
@@ -135,14 +146,14 @@ class GooglePlacesClientTest {
     void theDevelopmentFixtureOfTheRepositoryIsReadable() {
         GooglePlacesClient client = client("dev/google-places-fixture.json");
 
-        assertThat(client.searchNearby(List.of("restaurant"), OPERA, 2500)).isNotEmpty();
+        assertThat(client.searchText("restaurant", OPERA, 2500)).isNotEmpty();
     }
 
     @Test
     void anUnreadableFixtureIsServiceUnavailable(@TempDir Path dir) {
         GooglePlacesClient client = client(dir.resolve("missing.json").toString());
 
-        assertUnavailable(() -> client.searchNearby(List.of("restaurant"), OPERA, 2500));
+        assertUnavailable(() -> client.searchText("restaurant", OPERA, 2500));
     }
 
     private static void assertUnavailable(Runnable action) {
@@ -217,7 +228,7 @@ class GooglePlacesClientTest {
 
     // --- Failures (T051: T33-T37, T39; D2; contracts/google-places-requests.md "Error mapping") ---
 
-    private static final String SEARCH = BASE + "/places:searchNearby";
+    private static final String SEARCH = BASE + "/places:searchText";
 
     private List<String> warnings(Runnable action) {
         Logger logger = (Logger) LoggerFactory.getLogger(GooglePlacesClient.class);
@@ -235,7 +246,7 @@ class GooglePlacesClientTest {
 
     /** Runs a search that must fail with SERVICE_UNAVAILABLE and returns the warnings it logged. */
     private List<String> failingSearch(GooglePlacesClient client) {
-        List<String> messages = warnings(() -> assertUnavailable(() -> client.searchNearby(List.of("restaurant"),
+        List<String> messages = warnings(() -> assertUnavailable(() -> client.searchText("restaurant",
                 OPERA, 2500)));
         assertThat(messages).isNotEmpty().allSatisfy(m -> assertThat(m).doesNotContain(KEY)
                 .doesNotContain("X-Goog").contains("search"));
@@ -260,7 +271,7 @@ class GooglePlacesClientTest {
         server.expect(requestTo(SEARCH)).andRespond(withSuccess("{\"places\":[{\"id\":\"a\"}]}",
                 MediaType.APPLICATION_JSON));
 
-        assertThat(client.searchNearby(List.of("restaurant"), OPERA, 2500)).hasSize(1);
+        assertThat(client.searchText("restaurant", OPERA, 2500)).hasSize(1);
         server.verify();
     }
 

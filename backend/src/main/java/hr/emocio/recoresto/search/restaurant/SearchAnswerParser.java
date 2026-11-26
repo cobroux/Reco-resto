@@ -2,18 +2,21 @@ package hr.emocio.recoresto.search.restaurant;
 
 import hr.emocio.recoresto.search.api.Position;
 import hr.emocio.recoresto.search.criteria.SearchCriteria;
+import hr.emocio.recoresto.search.llm.JsonAnswers;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Reads the final answer of the language model into a {@link SearchAnswer}: its state, what it understood (criteria)
  * and the places it named, with their coordinates checked (spec 008 data-model.md "Model answer"). Any other field the
- * model writes (restaurants, queries, filters) is ignored: the backend builds the search itself (FR-002).
+ * model writes (restaurants, filters, Google types) is ignored: the backend builds the search itself (FR-002); the
+ * only text sent to Google is the {@code query} of the criteria (experiment of 2026-11-26).
  */
 @Component
 public class SearchAnswerParser {
@@ -24,13 +27,36 @@ public class SearchAnswerParser {
         this.mapper = mapper;
     }
 
+    /** Criteria fields the model sometimes writes outside "criteria" (one brace too many closes it early). */
+    private static final List<String> CRITERIA_FIELDS = List.of("query", "diets", "places", "moment",
+            "distanceLimitMeters", "walkingMinutes");
+
+    /**
+     * "criteria" completed with the criteria fields found at the top level of the answer, when "criteria" does not
+     * already give them (answer seen on 2026-11-26: "moment" closed out of "criteria"). Anything else is unchanged.
+     */
+    private JsonNode withTopLevelFields(JsonNode root) {
+        JsonNode criteria = root.path("criteria");
+        if (!(criteria.isMissingNode() || criteria.isNull() || criteria.isObject())) {
+            return criteria;
+        }
+        List<String> outside = CRITERIA_FIELDS.stream().filter(root::has)
+                .filter(field -> !criteria.isObject() || !criteria.has(field)).toList();
+        if (outside.isEmpty()) {
+            return criteria;
+        }
+        ObjectNode completed = criteria.isObject() ? ((ObjectNode) criteria).deepCopy() : mapper.createObjectNode();
+        outside.forEach(field -> completed.set(field, root.get(field)));
+        return completed;
+    }
+
     /**
      * Reads the first complete JSON object of the answer (D12), whatever text or code fence surrounds it (FR-004).
      * Missing optional fields give empty criteria (FR-005). An answer without a readable object, or one that does not
      * say whether it understood, is {@code UNREADABLE}, never "not a request" (FR-007).
      */
     public SearchAnswer parse(String reply) {
-        Optional<JsonNode> found = firstObject(reply);
+        Optional<JsonNode> found = JsonAnswers.firstObject(mapper, reply);
         if (found.isEmpty()) {
             return SearchAnswer.unreadable();
         }
@@ -45,10 +71,10 @@ public class SearchAnswerParser {
         if (bool(root.path("outsideFrance")).orElse(false)) {
             return SearchAnswer.placeOutsideFrance();
         }
-        JsonNode criteriaNode = root.path("criteria");
+        JsonNode criteriaNode = withTopLevelFields(root);
         SearchCriteria criteria;
         if (criteriaNode.isMissingNode() || criteriaNode.isNull()) {
-            criteria = new SearchCriteria(null, null, null, null, null, null, null);
+            criteria = new SearchCriteria(null, null, null, null, null, null);
         } else if (!criteriaNode.isObject()) {
             return SearchAnswer.unreadable();
         } else {
@@ -70,53 +96,6 @@ public class SearchAnswerParser {
             return Optional.of(Boolean.parseBoolean(node.asString()));
         }
         return Optional.empty();
-    }
-
-    /**
-     * The first balanced {@code {...}} block of the text that reads as a JSON object; braces inside strings are not
-     * structure. A block that does not read as JSON is skipped. Code fences are text around the object.
-     */
-    private Optional<JsonNode> firstObject(String reply) {
-        if (reply == null) {
-            return Optional.empty();
-        }
-        int depth = 0;
-        int start = -1;
-        boolean inString = false;
-        boolean escaped = false;
-        for (int i = 0; i < reply.length(); i++) {
-            char c = reply.charAt(i);
-            if (inString) {
-                if (escaped) {
-                    escaped = false;
-                } else if (c == '\\') {
-                    escaped = true;
-                } else if (c == '"') {
-                    inString = false;
-                }
-            } else if (c == '"') {
-                inString = depth > 0;
-            } else if (c == '{') {
-                if (depth++ == 0) {
-                    start = i;
-                }
-            } else if (c == '}' && depth > 0 && --depth == 0) {
-                Optional<JsonNode> object = readObject(reply.substring(start, i + 1));
-                if (object.isPresent()) {
-                    return object;
-                }
-            }
-        }
-        return Optional.empty();
-    }
-
-    private Optional<JsonNode> readObject(String text) {
-        try {
-            JsonNode node = mapper.readTree(text);
-            return node != null && node.isObject() ? Optional.of(node) : Optional.empty();
-        } catch (JacksonException e) {
-            return Optional.empty();
-        }
     }
 
     /**

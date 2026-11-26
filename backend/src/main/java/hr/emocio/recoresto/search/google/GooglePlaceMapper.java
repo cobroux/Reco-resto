@@ -1,6 +1,8 @@
 package hr.emocio.recoresto.search.google;
 
 import hr.emocio.recoresto.search.api.Position;
+import hr.emocio.recoresto.search.config.CardEnrichmentProperties;
+import hr.emocio.recoresto.search.enrichment.WebsiteAddress;
 import hr.emocio.recoresto.search.restaurant.Attribution;
 import hr.emocio.recoresto.search.restaurant.DataProvider;
 import hr.emocio.recoresto.search.restaurant.Restaurant;
@@ -40,6 +42,13 @@ public class GooglePlaceMapper {
     private static final Pattern PHOTO_NAME = Pattern.compile(
             "^places/(" + IDENTIFIER_CHARACTERS + ")/photos/(" + IDENTIFIER_CHARACTERS + ")$");
 
+    /** Spec 007 PO-8: the ports of a website the backend accepts, also those of {@code Restaurant.website}. */
+    private final List<Integer> websitePorts;
+
+    public GooglePlaceMapper(CardEnrichmentProperties enrichment) {
+        this.websitePorts = enrichment.allowedPorts();
+    }
+
     /** D16 (a): address of a photo through the backend; it never holds the key nor a Google host. */
     static String photoUrl(String placeId, String photoId) {
         return "/api/photos/" + placeId + "/" + photoId;
@@ -64,10 +73,15 @@ public class GooglePlaceMapper {
                 priceLevel(text(place.path("priceLevel"))),
                 GoogleOpeningHours.parse(place.path("regularOpeningHours")), photoUrl(photo), null,
                 address(place.path("shortFormattedAddress")), text(place.path("nationalPhoneNumber")), null,
-                text(place.path("websiteUri")), id, authors(photo.path("authorAttributions")),
+                website(text(place.path("websiteUri"))), id, authors(photo.path("authorAttributions")),
                 text(photo.path("googleMapsUri")), providers(place.path("attributions")));
         return Optional.of(new GooglePlace(id, types, text(place.path("primaryType")),
                 text(place.path("businessStatus")), vegetarian, restaurant));
+    }
+
+    /** Spec 007 TC-3, research R3: {@code Restaurant.website} only when it passes the single website rule. */
+    private String website(String value) {
+        return WebsiteAddress.parse(value, websitePorts).isPresent() ? value : null;
     }
 
     private static String priceLevel(String googleLevel) {

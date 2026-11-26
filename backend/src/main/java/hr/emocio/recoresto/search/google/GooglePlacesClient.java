@@ -35,7 +35,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * HTTP client of the Google Places API (New) (spec 008, contracts/google-places-requests.md): restaurant search
- * (Nearby Search), place location (Text Search, D13) and photo media (D16 a).
+ * (Text Search, experiment of 2026-11-26), place location (Text Search, D13) and photo media (D16 a).
  * <ul>
  * <li>The key is sent in the {@code X-Goog-Api-Key} header only, never in a URL (FR-013); without a key no request is
  * sent.</li>
@@ -120,13 +120,14 @@ public class GooglePlacesClient {
     }
 
     /**
-     * One Nearby Search (D3): the places of the given types inside the circle, at most
-     * {@code google-places.max-results}; an answer without places is an empty list.
+     * One Text Search (experiment of 2026-11-26, replacing the Nearby Search of D3): the restaurants Google finds for
+     * the text inside the rectangle holding the circle, one page of at most {@code google-places.max-results}, never
+     * the next page (one billed request per search point); an answer without places is an empty list.
      */
-    public List<JsonNode> searchNearby(List<String> includedTypes, Position center, double radiusMeters) {
+    public List<JsonNode> searchText(String query, Position center, double radiusMeters) {
         String operation = "search";
-        String body = hasFixture() ? readFixture() : call(operation, () -> post("/places:searchNearby",
-                SEARCH_FIELD_MASK, nearbyRequest(includedTypes, center, radiusMeters)));
+        String body = hasFixture() ? readFixture() : call(operation, () -> post("/places:searchText",
+                SEARCH_FIELD_MASK, textRequest(query, center, radiusMeters)));
         List<JsonNode> places = new ArrayList<>();
         readJson(operation, body).path("places").forEach(places::add);
         if (log.isDebugEnabled()) {
@@ -170,16 +171,27 @@ public class GooglePlacesClient {
         });
     }
 
-    private Map<String, Object> nearbyRequest(List<String> includedTypes, Position center, double radiusMeters) {
+    /**
+     * The Text Search body. {@code includedType} restaurant with {@code strictTypeFiltering}: only places of that type
+     * are returned, so that the single page is not spent on bakeries, bars or shops the D6 filter would remove anyway.
+     * The location is a restriction (never a bias): Text Search accepts only a rectangle for it.
+     */
+    private Map<String, Object> textRequest(String query, Position center, double radiusMeters) {
+        Position.Box box = center.boundingBox(radiusMeters);
         Map<String, Object> request = new LinkedHashMap<>();
-        request.put("includedTypes", includedTypes);
-        request.put("maxResultCount", properties.maxResults());
-        request.put("locationRestriction", Map.of("circle", Map.of(
-                "center", Map.of("latitude", center.latitude(), "longitude", center.longitude()),
-                "radius", radiusMeters)));
+        request.put("textQuery", query);
+        request.put("includedType", GooglePlaceTypes.RESTAURANT);
+        request.put("strictTypeFiltering", true);
+        request.put("pageSize", properties.maxResults());
+        request.put("locationRestriction", Map.of("rectangle", Map.of("low", point(box.low()), "high",
+                point(box.high()))));
         request.put("languageCode", properties.languageCode());
         request.put("regionCode", properties.regionCode());
         return request;
+    }
+
+    private static Map<String, Double> point(Position position) {
+        return Map.of("latitude", position.latitude(), "longitude", position.longitude());
     }
 
     private String post(String path, String fieldMask, Map<String, Object> request) {

@@ -104,6 +104,10 @@ public class SearchService {
                     "Nappe n'est disponible qu'en France pour l'instant");
         }
         SearchCriteria criteria = answer.criteria();
+        // Text Search experiment: the query holds words of the sentence, so only its length is logged at INFO.
+        log.info("Search query of {} characters, {} diet(s)", criteria.query() == null ? 0 : criteria.query().length(),
+                criteria.diets().size());
+        log.debug("Search query: {}", criteria.query());
         ZonedDateTime moment = momentResolver.resolve(criteria.moment());
         List<Position> points = searchPoints(answer, request.position());
         if (points.isEmpty()) {

@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
  * cannot be confirmed. One whose opening hours are unknown is kept (decision of 2026-11-25, a deviation from spec
  * 002 FR-007 to report in the PR: the model often leaves the hours out or gives a single day; confirmed for Google by
  * spec 008 D9 (1)). Spec 008 adds, on the Google place: a restaurant type (D6), a business status that is not closed
- * or future (D9 (3)), and the AND/OR criteria ({@link CriteriaMatcher}).
+ * or future (D9 (3)), and the diets the user requires ({@link CriteriaMatcher}).
  */
 @Component
 public class RestaurantFilters {

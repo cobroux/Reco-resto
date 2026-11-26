@@ -3,6 +3,7 @@ package hr.emocio.recoresto.search.google;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import hr.emocio.recoresto.search.api.Position;
+import hr.emocio.recoresto.search.config.TestCardEnrichmentProperties;
 import hr.emocio.recoresto.search.restaurant.Attribution;
 import hr.emocio.recoresto.search.restaurant.DataProvider;
 import hr.emocio.recoresto.search.restaurant.OpeningPeriod;
@@ -19,7 +20,7 @@ class GooglePlaceMapperTest {
     private static final Position CHATELET = new Position(48.8584, 2.3470);
 
     private final JsonMapper json = JsonMapper.builder().build();
-    private final GooglePlaceMapper mapper = new GooglePlaceMapper();
+    private final GooglePlaceMapper mapper = new GooglePlaceMapper(TestCardEnrichmentProperties.defaults());
 
     private static final String COMPLETE = """
             {"id":"place-1",
@@ -161,12 +162,24 @@ class GooglePlaceMapperTest {
         assertThat(restaurant(withField(""), OPERA).priceLevel()).isNull();
     }
 
-    /** T21, T25. */
+    /** Spec 008 T21, T25; spec 007 T1, T2. */
     @Test
     void theWebsiteIsGivenAsIsAndAbsentWhenMissing() {
         assertThat(restaurant(withField("\"websiteUri\":\"https://example.test/a\""), OPERA).website())
                 .isEqualTo("https://example.test/a");
+        assertThat(restaurant(withField("\"websiteUri\":\"http://example.test\""), OPERA).website())
+                .isEqualTo("http://example.test");
         assertThat(restaurant(withField(""), OPERA).website()).isNull();
+    }
+
+    /** Spec 007 T3, TC-3, research R3: an address breaking the website rule is not given. */
+    @Test
+    void anInvalidWebsiteIsNotGiven() {
+        assertThat(restaurant(withField("\"websiteUri\":\"ftp://example.test/\""), OPERA).website()).isNull();
+        assertThat(restaurant(withField("\"websiteUri\":\"monresto\""), OPERA).website()).isNull();
+        assertThat(restaurant(withField("\"websiteUri\":\"https://user:pw@example.test/\""), OPERA).website())
+                .isNull();
+        assertThat(restaurant(withField("\"websiteUri\":\"http://example.test:8080/\""), OPERA).website()).isNull();
     }
 
     /** D21 (3): national format. */
