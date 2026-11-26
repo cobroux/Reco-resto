@@ -9,6 +9,7 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.time.Duration;
 import java.util.Arrays;
@@ -158,6 +159,9 @@ public class SafeWebFetcher implements AutoCloseable {
             if (bytes[0] == 0x20 && bytes[1] == 0x02) { // 2002::/16 6to4, the IPv4 address in bytes 2 to 5
                 return isPublic(ipv4(bytes, 2));
             }
+            if (bytes[0] == 0x20 && bytes[1] == 0x01 && bytes[2] == 0 && bytes[3] == 0) { // 2001::/32 Teredo tunnel
+                return false;
+            }
             if ((bytes[0] & 0xfe) == 0xfc) { // fc00::/7 unique local
                 return false;
             }
@@ -167,17 +171,35 @@ public class SafeWebFetcher implements AutoCloseable {
             return false;
         }
         if (address instanceof Inet4Address) {
-            int first = address.getAddress()[0] & 0xff;
-            int second = address.getAddress()[1] & 0xff;
-            if (first == 0) { // 0.0.0.0/8 "this network"
-                return false;
-            }
-            if (first == 100 && (second & 0xc0) == 64) { // 100.64.0.0/10 carrier-grade NAT
-                return false;
-            }
+            int value = ByteBuffer.wrap(address.getAddress()).getInt();
+            return BLOCKED_IPV4.stream().noneMatch(range -> range.contains(value));
         }
         return true;
     }
+
+    /** An IPv4 range in CIDR notation. */
+    private record Ipv4Range(int network, int prefixLength) {
+
+        static Ipv4Range of(int a, int b, int c, int d, int prefixLength) {
+            return new Ipv4Range((a << 24) | (b << 16) | (c << 8) | d, prefixLength);
+        }
+
+        boolean contains(int address) {
+            int mask = prefixLength == 0 ? 0 : -1 << (32 - prefixLength);
+            return (address & mask) == (network & mask);
+        }
+    }
+
+    /**
+     * The IPv4 ranges refused besides those the JDK recognizes (loopback, private, link-local, multicast, any-local);
+     * PR #15 review.
+     */
+    private static final List<Ipv4Range> BLOCKED_IPV4 = List.of(
+            Ipv4Range.of(0, 0, 0, 0, 8), // "this network"
+            Ipv4Range.of(100, 64, 0, 0, 10), // carrier-grade NAT
+            Ipv4Range.of(192, 0, 0, 0, 24), // IETF protocol assignments
+            Ipv4Range.of(198, 18, 0, 0, 15), // benchmarking
+            Ipv4Range.of(240, 0, 0, 0, 4)); // reserved, and the broadcast 255.255.255.255
 
     private static InetAddress ipv4(byte[] bytes, int from) {
         try {

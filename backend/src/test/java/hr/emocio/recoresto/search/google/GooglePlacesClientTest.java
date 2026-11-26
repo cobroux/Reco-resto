@@ -179,6 +179,17 @@ class GooglePlacesClientTest {
         server.verify();
     }
 
+    /** PR #15 review: an unreadable type from Google is no failure; the controller refuses to serve it. */
+    @Test
+    void anUnreadablePhotoContentTypeIsKeptAsOctetStream() {
+        GooglePlacesClient client = client(null);
+        server.expect(requestTo(BASE + "/places/p1/photos/ph1/media?maxWidthPx=800"))
+                .andRespond(withSuccess(new byte[] {1}, null).header("Content-Type", "not a type"));
+
+        assertThat(client.photo("p1", "ph1").orElseThrow().contentType())
+                .isEqualTo(MediaType.APPLICATION_OCTET_STREAM_VALUE);
+    }
+
     @Test
     void anUnknownOrExpiredPhotoIsNotFound() {
         GooglePlacesClient client = client(null);

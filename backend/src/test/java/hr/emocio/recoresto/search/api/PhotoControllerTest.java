@@ -13,6 +13,8 @@ import hr.emocio.recoresto.search.google.GooglePhoto;
 import hr.emocio.recoresto.search.google.GooglePlacesClient;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -38,6 +40,17 @@ class PhotoControllerTest {
                 .andExpect(header().string("Content-Type", "image/jpeg"))
                 .andExpect(header().doesNotExist("X-Goog-Api-Key"))
                 .andExpect(content().bytes(new byte[] {1, 2, 3}));
+    }
+
+    /** PR #15 review: an unreadable or non-image type from Google is never served (the card keeps the tablecloth). */
+    @ParameterizedTest
+    @ValueSource(strings = {"not a type", "", "text/html", "application/octet-stream"})
+    void anUnreadableOrNonImageTypeIsABadGatewayWithoutBody(String type) throws Exception {
+        when(client.photo(any(), any())).thenReturn(Optional.of(new GooglePhoto(new byte[] {1, 2, 3}, type)));
+
+        mockMvc.perform(get("/api/photos/p1/ph1"))
+                .andExpect(status().isBadGateway())
+                .andExpect(content().string(""));
     }
 
     /** Research R5: identifiers only, so the endpoint can never be used as an open proxy. */

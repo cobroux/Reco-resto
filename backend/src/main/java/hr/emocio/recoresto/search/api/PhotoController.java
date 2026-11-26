@@ -2,6 +2,8 @@ package hr.emocio.recoresto.search.api;
 
 import hr.emocio.recoresto.search.google.GooglePlaceMapper;
 import hr.emocio.recoresto.search.google.GooglePlacesClient;
+import java.util.Optional;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,8 +32,19 @@ public class PhotoController {
             return ResponseEntity.badRequest().build();
         }
         return client.photo(placeId, photoId)
-                .map(photo -> ResponseEntity.ok().contentType(MediaType.parseMediaType(photo.contentType()))
-                        .body(photo.bytes()))
+                .map(photo -> imageType(photo.contentType())
+                        .map(type -> ResponseEntity.ok().contentType(type).body(photo.bytes()))
+                        .orElseGet(() -> ResponseEntity.status(HttpStatus.BAD_GATEWAY).build()))
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /** The type of the Google answer when it is a readable image type: anything else is never served (PR #15 review). */
+    private static Optional<MediaType> imageType(String contentType) {
+        try {
+            MediaType type = MediaType.parseMediaType(contentType);
+            return "image".equals(type.getType()) ? Optional.of(type) : Optional.empty();
+        } catch (IllegalArgumentException unreadable) {
+            return Optional.empty();
+        }
     }
 }

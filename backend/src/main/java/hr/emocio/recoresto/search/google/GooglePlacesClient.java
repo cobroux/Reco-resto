@@ -20,11 +20,13 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -158,17 +160,41 @@ public class GooglePlacesClient {
     public Optional<GooglePhoto> photo(String placeId, String photoId) {
         return call("photo", () -> {
             try {
-                ResponseEntity<byte[]> image = client.get()
+                // exchange, not retrieve: retrieve fails on an unreadable Content-Type before we can see it.
+                return client.get()
                         .uri(properties.baseUrl() + "/places/{placeId}/photos/{photoId}/media?maxWidthPx={width}",
                                 placeId, photoId, properties.photoMaxWidthPx())
-                        .header(API_KEY_HEADER, properties.apiKey()).retrieve().toEntity(byte[].class);
-                MediaType type = image.getHeaders().getContentType();
-                return Optional.of(new GooglePhoto(image.getBody() == null ? new byte[0] : image.getBody(),
-                        type == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : type.toString()));
+                        .header(API_KEY_HEADER, properties.apiKey()).exchange((request, response) -> {
+                            byte[] body = response.getBody().readAllBytes();
+                            if (response.getStatusCode().isError()) {
+                                throw statusError(response.getStatusCode(), response.getStatusText(),
+                                        response.getHeaders(), body);
+                            }
+                            MediaType type = readableContentType(response.getHeaders());
+                            return Optional.of(new GooglePhoto(body,
+                                    type == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : type.toString()));
+                        });
             } catch (HttpClientErrorException.NotFound e) {
                 return Optional.empty();
             }
         });
+    }
+
+    /** The exception {@code retrieve()} would throw for this error status, so that {@link #call} classifies it. */
+    private static HttpStatusCodeException statusError(HttpStatusCode status,
+            String statusText, HttpHeaders headers, byte[] body) {
+        return status.is4xxClientError()
+                ? HttpClientErrorException.create(status, statusText, headers, body, null)
+                : HttpServerErrorException.create(status, statusText, headers, body, null);
+    }
+
+    /** The {@code Content-Type} of an answer, null when absent or unreadable (PR #15 review). */
+    private static MediaType readableContentType(HttpHeaders headers) {
+        try {
+            return headers.getContentType();
+        } catch (IllegalArgumentException unreadable) {
+            return null;
+        }
     }
 
     /**
