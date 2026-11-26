@@ -191,6 +191,9 @@
       @if (restaurant().address; as address) {
         <p class="address" data-testid="address">{{ address }}</p>
       }
+      @if (restaurant().reason; as reason) {
+        <p class="reason" data-testid="reason">✨ {{ reason }}</p>
+      }
       <ul class="chips">
         <li class="chip cuisine">{{ restaurant().cuisine }}</li>
         @for (keyword of restaurant().keywords; track keyword) {

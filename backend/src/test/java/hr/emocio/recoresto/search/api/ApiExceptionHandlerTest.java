@@ -31,7 +31,6 @@ class ApiExceptionHandlerTest {
     @CsvSource({
             "NOT_UNDERSTOOD,422",
             "NO_RESULT,422",
-            "OUTSIDE_FRANCE,422",
             "PLACE_REQUIRED,422",
             "SERVICE_UNAVAILABLE,503"
     })
@@ -45,7 +44,7 @@ class ApiExceptionHandlerTest {
     @Test
     void errorCodesMatchTheContract() {
         org.assertj.core.api.Assertions.assertThat(SearchErrorCode.values()).extracting(Enum::name)
-                .containsExactlyInAnyOrder("NOT_UNDERSTOOD", "NO_RESULT", "OUTSIDE_FRANCE", "PLACE_REQUIRED",
+                .containsExactlyInAnyOrder("NOT_UNDERSTOOD", "NO_RESULT", "PLACE_REQUIRED",
                         "SERVICE_UNAVAILABLE");
     }
 }

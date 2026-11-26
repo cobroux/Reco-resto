@@ -4,7 +4,7 @@ import { Restaurant, SearchResult } from './search-result';
 
 function resultOf(moment: string | undefined, ...deck: Restaurant[]): SearchResult {
   return {
-    criteria: { cuisines: ['italian'], diets: [], places: ['Opéra, Paris'], moment },
+    criteria: { query: 'italien', diets: [], moment },
     deck,
   };
 }
@@ -81,6 +81,11 @@ describe('toDeckInput (spec 002 result for the swipe deck of spec 003)', () => {
       expect(mapped.priceLevel).toBe('€€');
       expect(mapped.photoUrl).toBe('http://photo');
       expect(mapped.dish).toEqual({ name: 'Curry vert' });
+    });
+
+    it('carries the reason of the model', () => {
+      expect(first({ ...THAI, reason: 'Curry réputé' }).reason).toBe('Curry réputé');
+      expect(first(THAI).reason).toBeUndefined();
     });
 
     it('carries the menu and the phone of the backend (spec 004)', () => {

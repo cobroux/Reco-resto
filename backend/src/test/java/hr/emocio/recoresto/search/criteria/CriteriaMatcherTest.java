@@ -15,7 +15,7 @@ class CriteriaMatcherTest {
     private final CriteriaMatcher matcher = new CriteriaMatcher();
 
     private static SearchCriteria diets(String... diets) {
-        return new SearchCriteria("restaurant", List.of(diets), null, null, null, null);
+        return new SearchCriteria("restaurant", List.of(diets), null, null);
     }
 
     private static GooglePlace withVegetarian(Boolean servesVegetarianFood, String... types) {
@@ -25,14 +25,14 @@ class CriteriaMatcherTest {
     @Test
     void noDietMatchesEveryRestaurant() {
         assertThat(matcher.matches(diets(), withVegetarian(null, "restaurant"))).isTrue();
-        assertThat(matcher.matches(new SearchCriteria(null, null, null, null, null, null),
+        assertThat(matcher.matches(new SearchCriteria(null, null, null, null),
                 withVegetarian(false, "thai_restaurant"))).isTrue();
     }
 
     /** The query is searched by Google, never compared with the place types. */
     @Test
     void theQueryIsNotMatchedAgainstThePlaceTypes() {
-        assertThat(matcher.matches(new SearchCriteria("pizza", null, null, null, null, null),
+        assertThat(matcher.matches(new SearchCriteria("pizza", null, null, null),
                 withVegetarian(null, "french_restaurant"))).isTrue();
     }
 

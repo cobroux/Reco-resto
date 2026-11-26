@@ -37,7 +37,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * HTTP client of the Google Places API (New) (spec 008, contracts/google-places-requests.md): restaurant search
- * (Text Search, experiment of 2026-11-26), place location (Text Search, D13) and photo media (D16 a).
+ * (Text Search, experiment of 2026-11-26) and photo media (D16 a).
  * <ul>
  * <li>The key is sent in the {@code X-Goog-Api-Key} header only, never in a URL (FR-013); without a key no request is
  * sent.</li>
@@ -56,10 +56,7 @@ public class GooglePlacesClient {
             "places.location", "places.shortFormattedAddress", "places.types", "places.primaryType",
             "places.primaryTypeDisplayName", "places.businessStatus", "places.photos", "places.attributions",
             "places.regularOpeningHours", "places.priceLevel", "places.websiteUri", "places.nationalPhoneNumber",
-            "places.servesVegetarianFood");
-
-    /** D13: what locating a named place needs (its point and its country). */
-    public static final String LOCATE_FIELD_MASK = "places.location,places.addressComponents";
+            "places.servesVegetarianFood", "places.rating", "places.userRatingCount", "places.editorialSummary");
 
     private static final String API_KEY_HEADER = "X-Goog-Api-Key";
     private static final String FIELD_MASK_HEADER = "X-Goog-FieldMask";
@@ -124,12 +121,17 @@ public class GooglePlacesClient {
     /**
      * One Text Search (experiment of 2026-11-26, replacing the Nearby Search of D3): the restaurants Google finds for
      * the text inside the rectangle holding the circle, one page of at most {@code google-places.max-results}, never
-     * the next page (one billed request per search point); an answer without places is an empty list.
+     * the next page (one billed request per search point), restricted to these Google price levels when not empty;
+     * an answer without places is an empty list.
      */
-    public List<JsonNode> searchText(String query, Position center, double radiusMeters) {
+    public List<JsonNode> searchText(String query, Position center, double radiusMeters, List<String> priceLevels) {
         String operation = "search";
+        Map<String, Object> textRequest = textRequest(query, center, radiusMeters);
+        if (!priceLevels.isEmpty()) {
+            textRequest.put("priceLevels", priceLevels);
+        }
         String body = hasFixture() ? readFixture() : call(operation, () -> post("/places:searchText",
-                SEARCH_FIELD_MASK, textRequest(query, center, radiusMeters)));
+                SEARCH_FIELD_MASK, textRequest));
         List<JsonNode> places = new ArrayList<>();
         readJson(operation, body).path("places").forEach(places::add);
         if (log.isDebugEnabled()) {
@@ -138,19 +140,6 @@ public class GooglePlacesClient {
                     places.isEmpty() ? List.of() : places.getFirst().propertyNames());
         }
         return places;
-    }
-
-    /** D13: the first place Google Text Search finds for a place name, empty when none. */
-    public Optional<JsonNode> locate(String name) {
-        String operation = "locate";
-        Map<String, Object> request = new LinkedHashMap<>();
-        request.put("textQuery", name);
-        request.put("pageSize", 1);
-        request.put("languageCode", properties.languageCode());
-        request.put("regionCode", properties.regionCode());
-        String body = call(operation, () -> post("/places:searchText", LOCATE_FIELD_MASK, request));
-        JsonNode first = readJson(operation, body).path("places").path(0);
-        return first.isObject() ? Optional.of(first) : Optional.empty();
     }
 
     /**

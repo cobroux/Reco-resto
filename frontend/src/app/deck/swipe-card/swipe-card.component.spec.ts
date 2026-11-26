@@ -117,6 +117,18 @@ describe('SwipeCardComponent', () => {
       expect(name.nextElementSibling).toBe(address);
     });
 
+    it('shows the reason of the model with a sparkle when there is one', async () => {
+      await create({ ...BARE, reason: 'Burger maison réputé' });
+
+      expect(root.querySelector('[data-testid="reason"]')?.textContent?.trim()).toBe('✨ Burger maison réputé');
+    });
+
+    it('shows no reason line without a reason', async () => {
+      await create(BARE);
+
+      expect(root.querySelector('[data-testid="reason"]')).toBeNull();
+    });
+
     it('shows no address line when the address is not known', async () => {
       await create(BARE);
 

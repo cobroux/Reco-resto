@@ -3,6 +3,19 @@ search:
   deck-size: 15
   # Every travel time is on foot; speed used to turn minutes into meters (value chosen by the team).
   walking-speed-kmh: 5
+  # Limits of the tool-calling search (product owner, 2026-11-26).
+  tool:
+    # Radius the model may ask for, in meters.
+    min-radius-meters: 300
+    max-radius-meters: 5000
+    # Longest text sent to Google Text Search, and longest reason shown on a card, in characters.
+    max-query-length: 100
+    max-reason-length: 120
+    # Candidates shown to the model (never fewer than the deck size).
+    max-candidates: 20
+    # Model requests of one search, and searches the model may run.
+    max-rounds: 3
+    max-tool-calls: 2
   # Spec 008, amendment "chains" (product owner, 2026-11-26): the deck (not the zone list) keeps at most one
   # restaurant per chain, the nearest one. Two restaurants are the same chain when they share the website host, the
   # normalized name, or a known chain name below.
@@ -69,9 +82,6 @@ llm:
   model: ${LLM_MODEL:nova-lite}
   # Largest answer asked for: the endpoint cuts at 2000 tokens by default, the model accepts up to 10000.
   max-tokens: ${LLM_MAX_TOKENS:10000}
-  # New attempts for an unusable answer: a blank message is asked again, an unreadable answer is sent back to the
-  # model for repair (spec 008 D11).
-  empty-answer-retries: ${LLM_EMPTY_ANSWER_RETRIES:2}
   # Sampling temperature: 0 gives the same reading of the same sentence (product owner, 2026-11-26).
   temperature: ${LLM_TEMPERATURE:0}
 

@@ -6,7 +6,7 @@ import { HttpSearchService } from './http-search.service';
 import { SearchFailure } from './search-result';
 
 const SENTENCE = 'asiatique végétarien près d’Opéra';
-const EMPTY_RESULT = { criteria: { cuisines: [], diets: [], places: [] }, deck: [] };
+const EMPTY_RESULT = { criteria: { diets: [] }, deck: [] };
 
 describe('HttpSearchService', () => {
   let service: HttpSearchService;
@@ -71,7 +71,7 @@ describe('HttpSearchService', () => {
     const next = vi.fn();
     const complete = vi.fn();
     const result = {
-      criteria: { cuisines: [], diets: [], places: [], moment: '2026-11-28T12:00' },
+      criteria: { diets: [], moment: '2026-11-28T12:00' },
       deck: [{ name: 'Thai Garden', address: '3 rue X', distanceMeters: 200, cuisine: 'thai' }],
     };
 
@@ -92,7 +92,7 @@ describe('HttpSearchService', () => {
     expect(complete).toHaveBeenCalledTimes(1);
   });
 
-  it.each([['NOT_UNDERSTOOD'], ['NO_RESULT'], ['OUTSIDE_FRANCE'], ['PLACE_REQUIRED']])(
+  it.each([['NOT_UNDERSTOOD'], ['NO_RESULT'], ['PLACE_REQUIRED']])(
     'reports the backend error code %s as a SearchFailure',
     async (code) => {
       vi.stubGlobal('navigator', {});

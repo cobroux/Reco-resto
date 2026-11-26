@@ -32,8 +32,8 @@ class SearchControllerTest {
     @MockitoBean
     private SearchService service;
 
-    private final SearchCriteria criteria = new SearchCriteria("asiatique", List.of("vegetarian"),
-            List.of("Opéra, Paris"), "now", null, null);
+    private final SearchCriteria criteria = new SearchCriteria("asiatique", List.of("vegetarian"), "now",
+            2500);
 
     @Test
     void returnsTheCriteriaAndTheDeckWithoutTheZoneByDefault() throws Exception {
@@ -44,10 +44,9 @@ class SearchControllerTest {
                         .content("{\"sentence\":\"asiatique près d'Opéra\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.criteria.query").value("asiatique"))
-                .andExpect(jsonPath("$.criteria.cuisines").isArray())
-                .andExpect(jsonPath("$.criteria.cuisines").isEmpty())
                 .andExpect(jsonPath("$.criteria.diets[0]").value("vegetarian"))
                 .andExpect(jsonPath("$.criteria.moment").value("now"))
+                .andExpect(jsonPath("$.criteria.distanceLimitMeters").value(2500))
                 .andExpect(jsonPath("$.deck[0].name").value("Thai"))
                 .andExpect(jsonPath("$.deck[0].address").value("1 rue Thai"))
                 .andExpect(jsonPath("$.zone").doesNotExist());
@@ -106,11 +105,24 @@ class SearchControllerTest {
         mockMvc.perform(post("/api/search").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sentence\":\"thaï\"}"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deck[0].reason").doesNotExist())
                 .andExpect(jsonPath("$.deck[0].website").doesNotExist())
                 .andExpect(jsonPath("$.deck[0].placeId").doesNotExist())
                 .andExpect(jsonPath("$.deck[0].photoAttributions").doesNotExist())
                 .andExpect(jsonPath("$.deck[0].photoSourceUri").doesNotExist())
                 .andExpect(jsonPath("$.deck[0].attributions").doesNotExist());
+    }
+
+    /** Why the model picked the restaurant, shown on the card. */
+    @Test
+    void theReasonOfTheModelIsSerialized() throws Exception {
+        when(service.search(any(), eq(false))).thenReturn(
+                new SearchResult(criteria, List.of(open("A").withReason("Burger maison")), null));
+
+        mockMvc.perform(post("/api/search").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sentence\":\"burger\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deck[0].reason").value("Burger maison"));
     }
 
     @Test

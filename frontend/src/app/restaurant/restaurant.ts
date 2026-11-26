@@ -48,4 +48,6 @@ export interface Restaurant {
   readonly menu?: readonly MenuItem[];
   /** Carried for a future "Appeler" action; not displayed (plan D-04-8). */
   readonly phone?: string;
+  /** Why the model picked this restaurant, shown on the card. */
+  readonly reason?: string;
 }

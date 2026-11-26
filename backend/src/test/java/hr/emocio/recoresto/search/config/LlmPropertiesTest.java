@@ -23,12 +23,6 @@ class LlmPropertiesTest {
         runner.run(context -> assertThat(context.getBean(LlmProperties.class).maxTokens()).isEqualTo(10000));
     }
 
-    /** The model sometimes answers with a blank message (seen 2026-11-25); asking again usually gives an answer. */
-    @Test
-    void anEmptyAnswerIsAskedAgainTwiceByDefault() {
-        runner.run(context -> assertThat(context.getBean(LlmProperties.class).emptyAnswerRetries()).isEqualTo(2));
-    }
-
     @Test
     void theLimitCanBeOverriddenByConfiguration() {
         runner.withPropertyValues("llm.max-tokens=4000")
