@@ -10,17 +10,27 @@ llm:
   model: ${LLM_MODEL:nova-lite}
   # Largest answer asked for: the endpoint cuts at 2000 tokens by default, the model accepts up to 10000.
   max-tokens: ${LLM_MAX_TOKENS:10000}
-  # The same request is sent again this many times when the model answers with a blank message.
+  # New attempts for an unusable answer: a blank message is asked again, an unreadable answer or a cuisine outside
+  # the closed list is sent back to the model for repair (spec 008 D11, Q3).
   empty-answer-retries: ${LLM_EMPTY_ANSWER_RETRIES:2}
 
-# Provisional values, NOT validated by the team (plan.md O11). Only max-calls (1) was given by the team.
-# Each one can be overridden by the OVERPASS_* environment variable of the same name.
-overpass:
-  base-url: ${OVERPASS_BASE_URL:https://overpass-api.de/api/interpreter}
-  timeout-seconds: ${OVERPASS_TIMEOUT_SECONDS:120}
-  max-response-bytes: ${OVERPASS_MAX_RESPONSE_BYTES:500000}
-  max-query-chars: ${OVERPASS_MAX_QUERY_CHARS:2000}
-  max-calls: ${OVERPASS_MAX_CALLS:1}
-  fixture-file: ${OVERPASS_FIXTURE_FILE:}
-  # Waits (seconds) before each new attempt after an HTTP 502 "at capacity"; 4 attempts in all. Chosen by the team.
-  retry-delays-seconds: ${OVERPASS_RETRY_DELAYS_SECONDS:5,10,20}
+# Google Places API (New), spec 008. Each value can be overridden by the GOOGLE_PLACES_* variable of the same name;
+# decisions: specs/008-google-places-source/plan.md "Product owner decisions (2026-11-25)".
+google-places:
+  # Documented endpoint of the Places API (New) (research R1).
+  base-url: ${GOOGLE_PLACES_BASE_URL:https://places.googleapis.com/v1}
+  # Server only, never committed with a value; no default value (FR-013).
+  api-key: ${GOOGLE_PLACES_API_KEY:}
+  # D1: Google is "not answering" after 10 s.
+  timeout-seconds: ${GOOGLE_PLACES_TIMEOUT_SECONDS:10}
+  # D2: one new attempt after 1 s on a Google server error, 429 or timeout; empty means a single attempt.
+  retry-delays-seconds: ${GOOGLE_PLACES_RETRY_DELAYS_SECONDS:1}
+  # D3: Nearby Search, at most 20 places per search point, no pagination.
+  max-results: ${GOOGLE_PLACES_MAX_RESULTS:20}
+  # D16: width of the photos fetched by the backend photo endpoint.
+  photo-max-width-px: ${GOOGLE_PLACES_PHOTO_MAX_WIDTH_PX:800}
+  # Technical (plan): the product is French and France-only.
+  language-code: fr
+  region-code: FR
+  # Development only: a Google answer read from this file instead of calling Google (data NOT real).
+  fixture-file: ${GOOGLE_PLACES_FIXTURE_FILE:}

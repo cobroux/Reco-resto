@@ -1,26 +1,38 @@
 package hr.emocio.recoresto.search.restaurant;
 
-import hr.emocio.recoresto.search.api.Position;
 import hr.emocio.recoresto.search.criteria.SearchCriteria;
 import java.util.List;
 
 /**
- * What the restaurant source gives back for a sentence: whether it was understood, whether the place is outside
- * France, the criteria it understood, the search points it used (one per place) and the restaurants found.
+ * What the language model understood from a sentence (spec 008 data-model.md "Model answer"): its state, the criteria
+ * and the places it named. The model never gives restaurants: the backend finds them.
  */
-public record SearchAnswer(boolean understood, boolean outsideFrance, SearchCriteria criteria, List<Position> centers,
-        List<Restaurant> restaurants) {
+public record SearchAnswer(State state, SearchCriteria criteria, List<NamedPlace> places) {
 
-    public SearchAnswer {
-        centers = centers == null ? List.of() : List.copyOf(centers);
-        restaurants = restaurants == null ? List.of() : List.copyOf(restaurants);
+    public enum State {
+        /** A restaurant request: the criteria and places are set. */
+        UNDERSTOOD,
+        /** The model states the sentence is not a restaurant request. */
+        NOT_A_REQUEST,
+        /** The model states a place of the sentence is outside France. */
+        OUTSIDE_FRANCE,
+        /** No answer could be read (no JSON object, invalid JSON, empty): never "not a request" (FR-007). */
+        UNREADABLE
     }
 
-    public static SearchAnswer notUnderstood() {
-        return new SearchAnswer(false, false, null, List.of(), List.of());
+    public SearchAnswer {
+        places = places == null ? List.of() : List.copyOf(places);
+    }
+
+    public static SearchAnswer notARequest() {
+        return new SearchAnswer(State.NOT_A_REQUEST, null, List.of());
+    }
+
+    public static SearchAnswer unreadable() {
+        return new SearchAnswer(State.UNREADABLE, null, List.of());
     }
 
     public static SearchAnswer placeOutsideFrance() {
-        return new SearchAnswer(true, true, null, List.of(), List.of());
+        return new SearchAnswer(State.OUTSIDE_FRANCE, null, List.of());
     }
 }

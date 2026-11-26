@@ -40,6 +40,7 @@ The frontend container (nginx) is the only one published (port 80) and proxies `
    - secret `EC2_HOST`: public IP or DNS name of the instance;
    - variable `EC2_USER`: `ec2-user`;
    - secret `LLM_API_KEY`, variables `LLM_BASE_URL` and `LLM_MODEL`: written to `~/.env` on the instance at each deploy (mode 600) and loaded by the backend container through `env_file`.
+   - secret `GOOGLE_PLACES_API_KEY` (Google Places API (New) key, spec 008): written to `~/.env` the same way at each deploy; never committed with a value.
 4. **Images are public**: after the first run of `deploy.yml`, open each package (`reco-resto-backend`, `reco-resto-frontend`) in the GitHub organisation's Packages and set its visibility to public. The instance pulls them without authentication.
 
 ## Known limits

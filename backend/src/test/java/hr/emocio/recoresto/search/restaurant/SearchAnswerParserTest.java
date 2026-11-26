@@ -30,14 +30,13 @@ class SearchAnswerParserTest {
 
         SearchAnswer answer = parser.parse(understood(criteria, "[" + OPERA + "]", "[]"));
 
-        assertThat(answer.understood()).isTrue();
-        assertThat(answer.outsideFrance()).isFalse();
+        assertThat(answer.state()).isEqualTo(SearchAnswer.State.UNDERSTOOD);
         assertThat(answer.criteria().cuisines()).containsExactly("asian");
         assertThat(answer.criteria().diets()).containsExactly("vegetarian");
         assertThat(answer.criteria().combination().operator()).isEqualTo("OR");
         assertThat(answer.criteria().places()).containsExactly("Opéra, Paris");
         assertThat(answer.criteria().moment()).isEqualTo("now");
-        assertThat(answer.centers()).containsExactly(new Position(48.8708, 2.3322));
+        assertThat(answer.places()).containsExactly(new NamedPlace("Opéra, Paris", new Position(48.8708, 2.3322)));
     }
 
     @Test
@@ -97,59 +96,190 @@ class SearchAnswerParserTest {
     }
 
     @Test
-    void notUnderstoodReplyGivesNotUnderstood() {
+    void notUnderstoodReplyGivesNotARequest() {
         SearchAnswer answer = parser.parse("{\"understood\":false}");
 
-        assertThat(answer.understood()).isFalse();
+        assertThat(answer.state()).isEqualTo(SearchAnswer.State.NOT_A_REQUEST);
     }
 
     @Test
-    void replyThatIsNotJsonIsNotUnderstood() {
-        assertThat(parser.parse("blablabla").understood()).isFalse();
+    void replyThatIsNotJsonIsUnreadableNeverNotARequest() {
+        assertThat(parser.parse("blablabla").state()).isEqualTo(SearchAnswer.State.UNREADABLE);
     }
 
     @Test
-    void understoodWithoutCriteriaIsNotUnderstood() {
-        assertThat(parser.parse("{\"understood\":true,\"restaurants\":[]}").understood()).isFalse();
+    void understoodWithoutCriteriaHasEmptyCriteria() {
+        SearchAnswer answer = parser.parse("{\"understood\":true,\"restaurants\":[]}");
+
+        assertThat(answer.state()).isEqualTo(SearchAnswer.State.UNDERSTOOD);
+        assertThat(answer.criteria()).isEqualTo(new SearchCriteria(null, null, null, null, null, null, null));
     }
 
     @Test
     void jsonSurroundedByTextIsStillRead() {
         String reply = "Here it is: " + understood("{\"cuisines\":[\"thai\"]}", "[" + OPERA + "]", "[]") + " Enjoy";
 
-        assertThat(parser.parse(reply).understood()).isTrue();
+        assertThat(parser.parse(reply).state()).isEqualTo(SearchAnswer.State.UNDERSTOOD);
     }
 
     @Test
     void placeOutsideFranceIsReported() {
         SearchAnswer answer = parser.parse("{\"understood\":true,\"outsideFrance\":true}");
 
-        assertThat(answer.understood()).isTrue();
-        assertThat(answer.outsideFrance()).isTrue();
+        assertThat(answer.state()).isEqualTo(SearchAnswer.State.OUTSIDE_FRANCE);
     }
 
     @Test
-    void centerWithAnInvalidCoordinateIsDropped() {
-        String centers = "[{\"latitude\":148.0,\"longitude\":2.3},{\"latitude\":\"x\",\"longitude\":2.3},"
-                + "{\"latitude\":48.87},{\"latitude\":48.8708,\"longitude\":2.3322}]";
+    void aCenterWithAnInvalidCoordinateIsANamedPlaceWithoutPosition() {
+        String centers = "[{\"name\":\"A\",\"latitude\":148.0,\"longitude\":2.3},"
+                + "{\"name\":\"B\",\"latitude\":\"x\",\"longitude\":2.3},{\"name\":\"C\",\"latitude\":48.87},"
+                + "{\"latitude\":148.0,\"longitude\":2.3},"
+                + "{\"name\":\"D\",\"latitude\":48.8708,\"longitude\":2.3322}]";
 
         SearchAnswer answer = parser.parse(understood("{\"cuisines\":[\"thai\"]}", centers, "[]"));
 
-        assertThat(answer.centers()).containsExactly(new Position(48.8708, 2.3322));
+        assertThat(answer.places()).containsExactly(new NamedPlace("A", null), new NamedPlace("B", null),
+                new NamedPlace("C", null), new NamedPlace("D", new Position(48.8708, 2.3322)));
     }
 
     @Test
-    void noCenterIsKeptEmptyForTheCallerToDecide() {
-        assertThat(parser.parse(understood("{\"cuisines\":[\"thai\"]}", "[]", "[]")).centers()).isEmpty();
+    void withoutCentersTheNamedPlacesOfTheCriteriaHaveNoPosition() {
+        SearchAnswer answer = parser.parse(understood("{\"places\":[\"Opéra, Paris\",\"Châtelet\"]}", "[]",
+                "[]"));
+
+        assertThat(answer.places()).containsExactly(new NamedPlace("Opéra, Paris", null),
+                new NamedPlace("Châtelet", null));
     }
 
     @Test
-    void restaurantsWrittenByTheModelAreIgnoredBecauseTheBackendReadsThemFromOverpass() {
+    void noPlaceAtAllGivesNoPlace() {
+        assertThat(parser.parse(understood("{\"cuisines\":[\"thai\"]}", "[]", "[]")).places()).isEmpty();
+    }
+
+    @Test
+    void restaurantsWrittenByTheModelAreIgnoredBecauseTheBackendFindsThem() {
         String restaurants = "[{\"name\":\"Invented\",\"address\":\"1 rue A\"}]";
 
         SearchAnswer answer = parser.parse(understood("{\"cuisines\":[\"thai\"]}", "[" + OPERA + "]", restaurants));
 
-        assertThat(answer.understood()).isTrue();
-        assertThat(answer.restaurants()).isEmpty();
+        assertThat(answer.state()).isEqualTo(SearchAnswer.State.UNDERSTOOD);
+        assertThat(answer.places()).containsExactly(new NamedPlace("Opéra, Paris", new Position(48.8708, 2.3322)));
+    }
+
+    // --- Robust reading (T043: T12-T19; FR-004 to FR-007; D12) ---
+
+    private static String recorded(String name) {
+        try (var stream = SearchAnswerParserTest.class.getResourceAsStream("/llm-answers/" + name)) {
+            return new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    }
+
+    private static final NamedPlace OPERA_PLACE = new NamedPlace("Opéra, Paris", new Position(48.8708, 2.3322));
+
+    /** T12. */
+    @Test
+    void textAroundTheAnswerIsIgnored() {
+        SearchAnswer answer = parser.parse(recorded("prose-around.txt"));
+
+        assertThat(answer.state()).isEqualTo(SearchAnswer.State.UNDERSTOOD);
+        assertThat(answer.places()).containsExactly(OPERA_PLACE);
+    }
+
+    /** T13. */
+    @Test
+    void aJsonCodeFenceIsIgnored() {
+        SearchAnswer answer = parser.parse(recorded("json-fence.txt"));
+
+        assertThat(answer.state()).isEqualTo(SearchAnswer.State.UNDERSTOOD);
+        assertThat(answer.places()).containsExactly(OPERA_PLACE);
+    }
+
+    /** T14, D12: the first complete object is read. */
+    @Test
+    void ofTwoObjectsTheFirstCompleteOneIsRead() {
+        SearchAnswer answer = parser.parse(recorded("two-objects.txt"));
+
+        assertThat(answer.state()).isEqualTo(SearchAnswer.State.UNDERSTOOD);
+        assertThat(answer.places()).containsExactly(OPERA_PLACE);
+    }
+
+    @Test
+    void aBalancedTextThatIsNotJsonIsSkippedForTheNextObject() {
+        SearchAnswer answer = parser.parse("{voici} " + understood("{}", "[" + OPERA + "]", "[]"));
+
+        assertThat(answer.state()).isEqualTo(SearchAnswer.State.UNDERSTOOD);
+    }
+
+    /** T15, FR-005: missing optional fields give empty criteria (002 defaults). */
+    @Test
+    void onlyUnderstoodAndAPlaceGiveEmptyCriteria() {
+        SearchAnswer answer = parser.parse(recorded("only-understood-and-place.txt"));
+
+        assertThat(answer.state()).isEqualTo(SearchAnswer.State.UNDERSTOOD);
+        assertThat(answer.criteria()).isEqualTo(new SearchCriteria(null, null, null, null, null, null, null));
+        assertThat(answer.places()).containsExactly(OPERA_PLACE);
+    }
+
+    /** T16. */
+    @Test
+    void withoutCentersThePlaceIsKeptWithoutPosition() {
+        SearchAnswer answer = parser.parse(recorded("no-centers.txt"));
+
+        assertThat(answer.state()).isEqualTo(SearchAnswer.State.UNDERSTOOD);
+        assertThat(answer.places()).containsExactly(new NamedPlace("Opéra, Paris", null));
+    }
+
+    /** T17. */
+    @Test
+    void aCenterOutOfRangeIsAPlaceWithoutPosition() {
+        SearchAnswer answer = parser.parse(recorded("out-of-range-center.txt"));
+
+        assertThat(answer.state()).isEqualTo(SearchAnswer.State.UNDERSTOOD);
+        assertThat(answer.places()).containsExactly(new NamedPlace("Opéra, Paris", null));
+    }
+
+    /** T18, FR-007. */
+    @Test
+    void aMissingClosingBraceIsUnreadable() {
+        assertThat(parser.parse(recorded("missing-closing-brace.txt")).state())
+                .isEqualTo(SearchAnswer.State.UNREADABLE);
+    }
+
+    /** T19, FR-007. */
+    @Test
+    void anEmptyAnswerIsUnreadable() {
+        assertThat(parser.parse(recorded("empty.txt")).state()).isEqualTo(SearchAnswer.State.UNREADABLE);
+        assertThat(parser.parse("   ").state()).isEqualTo(SearchAnswer.State.UNREADABLE);
+        assertThat(parser.parse(null).state()).isEqualTo(SearchAnswer.State.UNREADABLE);
+    }
+
+    @Test
+    void bracesInsideStringsAreNotStructure() {
+        String reply = "{\"understood\":true,\"criteria\":{\"places\":[\"Le {Bistrot} }\"]},"
+                + "\"centers\":[{\"name\":\"Le \\\"{\\\" bar\",\"latitude\":48.8708,\"longitude\":2.3322}]} fin }";
+
+        SearchAnswer answer = parser.parse(reply);
+
+        assertThat(answer.state()).isEqualTo(SearchAnswer.State.UNDERSTOOD);
+        assertThat(answer.criteria().places()).containsExactly("Le {Bistrot} }");
+        assertThat(answer.places()).containsExactly(new NamedPlace("Le \"{\" bar", new Position(48.8708, 2.3322)));
+    }
+
+    /** FR-007: only a readable statement that the sentence is not a request is "not a request". */
+    @Test
+    void anObjectThatDoesNotSayWhetherItUnderstoodIsUnreadable() {
+        assertThat(parser.parse("{\"criteria\":{\"places\":[\"Opéra\"]}}").state())
+                .isEqualTo(SearchAnswer.State.UNREADABLE);
+        assertThat(parser.parse("{\"understood\":\"maybe\"}").state()).isEqualTo(SearchAnswer.State.UNREADABLE);
+    }
+
+    @Test
+    void criteriaThatCannotBeReadAreUnreadable() {
+        assertThat(parser.parse("{\"understood\":true,\"criteria\":\"italian\"}").state())
+                .isEqualTo(SearchAnswer.State.UNREADABLE);
+        assertThat(parser.parse("{\"understood\":true,\"criteria\":{\"cuisines\":{\"a\":1}}}").state())
+                .isEqualTo(SearchAnswer.State.UNREADABLE);
     }
 }

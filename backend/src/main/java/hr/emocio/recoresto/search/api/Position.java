@@ -4,6 +4,11 @@ public record Position(double latitude, double longitude) {
 
     private static final double EARTH_RADIUS_METERS = 6_371_000;
 
+    /** Whether the coordinates are a point on Earth (latitude -90..90, longitude -180..180). */
+    public static boolean isValid(double latitude, double longitude) {
+        return Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180;
+    }
+
     /** Great-circle (haversine) distance to another position, in meters. */
     public double distanceMetersTo(Position other) {
         double lat1 = Math.toRadians(latitude);
