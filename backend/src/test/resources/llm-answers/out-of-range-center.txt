@@ -1,0 +1,1 @@
+{"understood":true,"criteria":{"places":["Opéra, Paris"]},"centers":[{"name":"Opéra, Paris","latitude":148.8708,"longitude":2.3322}]}

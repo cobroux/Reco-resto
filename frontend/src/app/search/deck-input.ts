@@ -61,7 +61,8 @@ function weeklyHours(restaurant: Restaurant): OpeningRange[][] {
 
 function toDeckRestaurant(restaurant: Restaurant & { address: string; distanceMeters: number }): DeckRestaurant {
   return {
-    id: `${restaurant.name}|${restaurant.address}`,
+    // Spec 008 (research R11): the Google place id identifies a place; older sources fall back to name|address.
+    id: restaurant.placeId ?? `${restaurant.name}|${restaurant.address}`,
     name: restaurant.name,
     address: restaurant.address,
     distanceMeters: restaurant.distanceMeters,
@@ -71,6 +72,10 @@ function toDeckRestaurant(restaurant: Restaurant & { address: string; distanceMe
     weeklyHours: weeklyHours(restaurant),
     photoUrl: restaurant.photoUrl,
     dish: restaurant.signatureDish ? { name: restaurant.signatureDish } : undefined,
+    website: restaurant.website,
+    photoAttributions: restaurant.photoAttributions,
+    photoSourceUri: restaurant.photoSourceUri,
+    attributions: restaurant.attributions,
     menu: restaurant.menu,
     phone: restaurant.phone,
   };

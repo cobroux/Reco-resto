@@ -1,0 +1,154 @@
+# Contract of feature 002 (specs/002-natural-language-search/contracts/search-api.openapi.yaml) as changed by 008.
+# Every change is an OPTIONAL addition marked "008" (spec FR-011); nothing is removed, renamed or changes meaning.
+# The /api/photos path exists only if decision D16 (plan.md) chooses the backend photo address.
+# Proposed: to approve at plan review.
+openapi: 3.0.3
+info:
+  title: Reco-Resto search API
+  version: 0.2.0-draft
+paths:
+  /api/search:
+    post:
+      summary: Understand a sentence and return matching restaurants (restaurants from Google Places since 008)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SearchRequest' }
+      parameters:
+        - name: includeZone
+          in: query
+          required: false
+          schema: { type: boolean, default: false }
+          description: Also return every restaurant of the search zone (002 FR-013), bounded by what Google returns (008 FR-017).
+      responses:
+        '200':
+          description: Search succeeded (deck may be shorter than the deck size)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SearchResult' }
+        '422':
+          description: Search cannot be run; see error code
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: >-
+            Search service unavailable (frontend shows "Réessayer"). Since 008 also for every Google Places failure
+            (unavailable, timeout, quota, missing or invalid key; FR-012 option A) and for a language-model answer
+            that stays unreadable after the recovery attempts (FR-007).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/photos/{placeId}/{photoId}:
+    get:
+      summary: "008 (only if D16 = backend photo address): photo of a restaurant, without exposing the Google key"
+      description: >-
+        The address is built by the backend and returned in Restaurant.photoUrl; the browser never builds it. The
+        backend calls the Google photo media endpoint for places/{placeId}/photos/{photoId} and answers with the
+        image (or a redirect to a key-free Google address). Path parameters accept identifier characters only.
+      parameters:
+        - { name: placeId, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]+$' } }
+        - { name: photoId, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]+$' } }
+      responses:
+        '200':
+          description: The image
+          content:
+            image/*: {}
+        '302':
+          description: Redirect to a key-free Google image address (variant of D16 a)
+        '404':
+          description: Unknown or expired photo; the card shows the tablecloth (FR-010)
+        '503':
+          description: Google unavailable, quota exceeded or key missing/invalid; the card shows the tablecloth
+components:
+  schemas:
+    Position:
+      type: object
+      required: [latitude, longitude]
+      properties:
+        latitude: { type: number }
+        longitude: { type: number }
+    SearchRequest:
+      type: object
+      required: [sentence]
+      properties:
+        sentence: { type: string, minLength: 1 }
+        position: { $ref: '#/components/schemas/Position' }
+    SearchCriteria:
+      type: object
+      properties:
+        cuisines: { type: array, items: { type: string }, description: "Values per decision D7" }
+        diets: { type: array, items: { type: string } }
+        combination: { type: object, description: AND/OR tree over cuisines and diets }
+        places: { type: array, items: { type: string } }
+        moment: { type: string, description: ISO 8601 date-time, or "now" }
+        distanceLimitMeters: { type: integer, nullable: true }
+        walkingMinutes: { type: integer, nullable: true, description: Travel time of the sentence, always on foot (the backend turns it into a distance at the walking speed) }
+    Attribution:
+      type: object
+      description: "008: author of a photo (Google authorAttributions)"
+      required: [displayName]
+      properties:
+        displayName: { type: string }
+        uri: { type: string, format: uri }
+    DataProvider:
+      type: object
+      description: "008: third-party data provider Google requires to show with the place (Google attributions)"
+      required: [provider]
+      properties:
+        provider: { type: string }
+        providerUri: { type: string, format: uri }
+    Restaurant:
+      type: object
+      required: [name, location, address]
+      properties:
+        name: { type: string }
+        location: { $ref: '#/components/schemas/Position' }
+        distanceMeters: { type: integer }
+        cuisine: { type: string, description: "Wording per decision D21 (1)" }
+        diets: { type: array, items: { type: string }, description: Only diets the source states (008 FR-009) }
+        keywords: { type: array, items: { type: string } }
+        priceLevel: { type: string, description: "Format of feature 003 (e.g. €€); mapping per decision D5" }
+        openingHours:
+          type: object
+          description: Weekly hours keyed by upper-case English day name ("MONDAY"), each a list of {opens, closes} local "HH:mm"; closes not after opens means until the end of the day
+          additionalProperties:
+            type: array
+            items:
+              type: object
+              properties:
+                opens: { type: string }
+                closes: { type: string }
+        photoUrl: { type: string, description: "Address the browser can load; never contains the Google key (008 FR-010, FR-013)" }
+        signatureDish: { type: string }
+        address: { type: string }
+        phone: { type: string }
+        menu:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              description: { type: string }
+              price: { type: string }
+        website: { type: string, format: uri, description: "008: website of the restaurant (Google websiteUri)" }
+        placeId: { type: string, description: "008: Google place identifier" }
+        photoAttributions: { type: array, items: { $ref: '#/components/schemas/Attribution' }, description: "008: authors of the photo" }
+        photoSourceUri: { type: string, format: uri, description: "008: the photo on Google Maps" }
+        attributions: { type: array, items: { $ref: '#/components/schemas/DataProvider' }, description: "008: data providers to show" }
+    SearchResult:
+      type: object
+      required: [criteria, deck]
+      properties:
+        criteria: { $ref: '#/components/schemas/SearchCriteria' }
+        deck: { type: array, items: { $ref: '#/components/schemas/Restaurant' } }
+        zone: { type: array, items: { $ref: '#/components/schemas/Restaurant' } }
+    Error:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          enum: [NOT_UNDERSTOOD, NO_RESULT, OUTSIDE_FRANCE, PLACE_REQUIRED, SERVICE_UNAVAILABLE]
+        message: { type: string }

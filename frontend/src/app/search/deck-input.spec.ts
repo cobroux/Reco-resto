@@ -125,6 +125,48 @@ describe('toDeckInput (spec 002 result for the swipe deck of spec 003)', () => {
       expect(mapped.weeklyHours).toEqual([[], [], [], [], [], [], []]);
     });
 
+    describe('Google Places fields (spec 008, T21, T31, T32)', () => {
+      const GOOGLE: Restaurant = {
+        ...THAI,
+        website: 'https://baan-thai.example',
+        placeId: 'ChIJ_baan-thai',
+        photoAttributions: [{ displayName: 'Jane Doe', uri: 'https://maps.google.com/contrib/1' }],
+        photoSourceUri: 'https://maps.google.com/photo/1',
+        attributions: [{ provider: 'Some Provider', providerUri: 'https://provider.example' }],
+      };
+
+      it('maps a response with the new optional fields without error', () => {
+        const mapped = first(GOOGLE);
+
+        expect(mapped.name).toBe('Baan Thaï');
+        expect(mapped.website).toBe('https://baan-thai.example');
+        expect(mapped.photoAttributions).toEqual([
+          { displayName: 'Jane Doe', uri: 'https://maps.google.com/contrib/1' },
+        ]);
+        expect(mapped.photoSourceUri).toBe('https://maps.google.com/photo/1');
+        expect(mapped.attributions).toEqual([
+          { provider: 'Some Provider', providerUri: 'https://provider.example' },
+        ]);
+      });
+
+      it('uses the Google place id as deck id when present (research R11)', () => {
+        expect(first(GOOGLE).id).toBe('ChIJ_baan-thai');
+      });
+
+      it('falls back to name|address as deck id without place id', () => {
+        expect(first(THAI).id).toBe('Baan Thaï|3 rue X, Paris');
+      });
+
+      it('maps a response without the new fields as before', () => {
+        const mapped = first(THAI);
+
+        expect(mapped.website).toBeUndefined();
+        expect(mapped.photoAttributions).toBeUndefined();
+        expect(mapped.photoSourceUri).toBeUndefined();
+        expect(mapped.attributions).toBeUndefined();
+      });
+    });
+
     it('keeps the order of the deck', () => {
       const input = toDeckInput(
         resultOf(

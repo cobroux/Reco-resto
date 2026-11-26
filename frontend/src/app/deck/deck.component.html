@@ -52,6 +52,7 @@
             <app-swipe-card
               [restaurant]="restaurant"
               [targetDateTime]="targetDateTime()"
+              [enrichment]="enrichment.photo(restaurant.website)"
               [disabled]="store.pending()"
               (swiped)="onSwiped($event)"
               (left)="onLeft($event)"

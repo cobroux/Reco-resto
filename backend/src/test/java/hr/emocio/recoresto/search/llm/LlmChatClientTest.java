@@ -3,11 +3,11 @@ package hr.emocio.recoresto.search.llm;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import ch.qos.logback.classic.Level;
@@ -17,13 +17,12 @@ import ch.qos.logback.core.read.ListAppender;
 import hr.emocio.recoresto.search.api.SearchErrorCode;
 import hr.emocio.recoresto.search.api.SearchException;
 import hr.emocio.recoresto.search.config.LlmProperties;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -38,7 +37,7 @@ class LlmChatClientTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new LlmChatClient(builder, new LlmProperties("https://llm.test/v1/", "secret", "nova-lite", 10000, 2),
+        client = new LlmChatClient(builder, new LlmProperties("https://llm.test/v1/", "secret", "nova-lite", 10000, 2, 0.0),
                 JsonMapper.builder().build());
     }
 
@@ -60,6 +59,18 @@ class LlmChatClientTest {
         server.verify();
     }
 
+    /** Answers changed from one search to the next (2026-11-26): the configured temperature is sent. */
+    @Test
+    void theRequestAsksForTheConfiguredTemperature() {
+        server.expect(requestTo("https://llm.test/v1/chat/completions"))
+                .andExpect(jsonPath("$.temperature").value(0.0))
+                .andRespond(withSuccess(FINAL_REPLY, MediaType.APPLICATION_JSON));
+
+        client.complete("s", "u");
+
+        server.verify();
+    }
+
     @Test
     void theRequestAsksForTheConfiguredMaximumNumberOfOutputTokens() {
         server.expect(requestTo("https://llm.test/v1/chat/completions"))
@@ -76,9 +87,10 @@ class LlmChatClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer other = MockRestServiceServer.bindTo(builder).build();
         LlmChatClient noLimit = new LlmChatClient(builder,
-                new LlmProperties("https://llm.test/v1", "secret", "nova-lite", null, null), JsonMapper.builder().build());
+                new LlmProperties("https://llm.test/v1", "secret", "nova-lite", null, null, null), JsonMapper.builder().build());
         other.expect(requestTo("https://llm.test/v1/chat/completions"))
                 .andExpect(jsonPath("$.max_tokens").doesNotExist())
+                .andExpect(jsonPath("$.temperature").doesNotExist())
                 .andRespond(withSuccess(FINAL_REPLY, MediaType.APPLICATION_JSON));
 
         noLimit.complete("s", "u");
@@ -119,7 +131,7 @@ class LlmChatClientTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer other = MockRestServiceServer.bindTo(builder).build();
         LlmChatClient noRetry = new LlmChatClient(builder,
-                new LlmProperties("https://llm.test/v1", "secret", "nova-lite", null, null), JsonMapper.builder().build());
+                new LlmProperties("https://llm.test/v1", "secret", "nova-lite", null, null, null), JsonMapper.builder().build());
         other.expect(requestTo("https://llm.test/v1/chat/completions"))
                 .andRespond(withSuccess(EMPTY_REPLY, MediaType.APPLICATION_JSON));
 
@@ -129,15 +141,22 @@ class LlmChatClientTest {
     }
 
     @Test
-    void theFinishReasonAndTheTokensUsedAreLoggedAtDebugLevel() {
+    void theFinishReasonIsLoggedAtDebugLevelAndTheTokensUsedAtInfoLevel() {
         server.expect(requestTo("https://llm.test/v1/chat/completions")).andRespond(withSuccess(
                 "{\"choices\":[{\"finish_reason\":\"length\",\"message\":{\"role\":\"assistant\",\"content\":\"x\"}}],"
-                        + "\"usage\":{\"completion_tokens\":2000}}", MediaType.APPLICATION_JSON));
+                        + "\"usage\":{\"prompt_tokens\":1200,\"completion_tokens\":2000,\"total_tokens\":3200}}",
+                MediaType.APPLICATION_JSON));
 
-        List<String> messages = logsOf(Level.DEBUG, () -> client.complete("s", "u"));
+        List<String> debug = logsOf(Level.DEBUG, () -> client.complete("s", "u"));
 
-        assertThat(messages).anySatisfy(m -> assertThat(m).contains("finish_reason=length")
-                .contains("completion_tokens=2000"));
+        assertThat(debug).anySatisfy(m -> assertThat(m).contains("finish_reason=length"));
+        server.reset();
+        server.expect(requestTo("https://llm.test/v1/chat/completions")).andRespond(withSuccess(
+                "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"x\"}}],"
+                        + "\"usage\":{\"prompt_tokens\":1200,\"completion_tokens\":2000,\"total_tokens\":3200}}",
+                MediaType.APPLICATION_JSON));
+        List<String> info = logsOf(Level.INFO, () -> client.complete("s", "u"));
+        assertThat(info).anySatisfy(m -> assertThat(m).contains("LLM tokens: prompt 1200, completion 2000, total 3200"));
     }
 
     @Test
@@ -146,6 +165,35 @@ class LlmChatClientTest {
 
         assertThatThrownBy(() -> client.complete("s", "u")).isInstanceOfSatisfying(SearchException.class,
                 e -> assertThat(e.code()).isEqualTo(SearchErrorCode.SERVICE_UNAVAILABLE));
+    }
+
+    /** A refused request is logged at WARN with its HTTP status and the provider error code, never the key. */
+    @Test
+    void aRefusedRequestIsLoggedWithItsStatusAndErrorCode() {
+        server.expect(requestTo("https://llm.test/v1/chat/completions")).andRespond(
+                withStatus(HttpStatus.TOO_MANY_REQUESTS).contentType(MediaType.APPLICATION_JSON).body(
+                        "{\"error\":{\"message\":\"Rate limit reached for api_key: 0ec541babdd5c1c0707abd65c088a98556e0fee3ffe4dcd0a31c71e2f0bd76b7\",\"type\":\"requests\",\"code\":\"rate_limit_exceeded\"}}"));
+
+        List<String> messages = logsOf(Level.WARN, () -> assertThatThrownBy(() -> client.complete("s", "u"))
+                .isInstanceOf(SearchException.class));
+
+        assertThat(messages).anySatisfy(m -> assertThat(m).contains("LLM request failed").contains("HTTP 429")
+                .contains("rate_limit_exceeded").contains("Rate limit reached"));
+        assertThat(messages).noneSatisfy(m -> assertThat(m).contains("secret"));
+        assertThat(messages).noneSatisfy(m -> assertThat(m).contains("0ec541babdd5"));
+    }
+
+    /** A network failure is logged at WARN with its cause class. */
+    @Test
+    void aNetworkFailureIsLoggedWithItsCause() {
+        server.expect(requestTo("https://llm.test/v1/chat/completions")).andRespond(request -> {
+            throw new java.net.ConnectException("Connection refused");
+        });
+
+        List<String> messages = logsOf(Level.WARN, () -> assertThatThrownBy(() -> client.complete("s", "u"))
+                .isInstanceOf(SearchException.class));
+
+        assertThat(messages).anySatisfy(m -> assertThat(m).contains("LLM request failed").contains("ConnectException"));
     }
 
     @Test
@@ -157,106 +205,8 @@ class LlmChatClientTest {
                 e -> assertThat(e.code()).isEqualTo(SearchErrorCode.SERVICE_UNAVAILABLE));
     }
 
-    private static final LlmChatClient.Tool OVERPASS = new LlmChatClient.Tool("overpass", "Runs an Overpass query",
-            Map.of("type", "object", "properties", Map.of("query", Map.of("type", "string")), "required",
-                    List.of("query")));
-
-    private static final String TOOL_CALL_REPLY = """
-            {"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[
-              {"id":"call_1","type":"function","function":{"name":"overpass","arguments":"{\\"query\\":\\"Q1\\"}"}}]}}]}""";
-
     private static final String FINAL_REPLY =
             "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"done\"}}]}";
-
-    @Test
-    void toolCallRoundTripSendsTheToolResultBackAndReturnsTheFinalAnswer() {
-        server.expect(requestTo("https://llm.test/v1/chat/completions"))
-                .andExpect(jsonPath("$.tools[0].type").value("function"))
-                .andExpect(jsonPath("$.tools[0].function.name").value("overpass"))
-                .andRespond(withSuccess(TOOL_CALL_REPLY, MediaType.APPLICATION_JSON));
-        server.expect(requestTo("https://llm.test/v1/chat/completions"))
-                .andExpect(jsonPath("$.messages[2].role").value("assistant"))
-                .andExpect(jsonPath("$.messages[2].tool_calls[0].id").value("call_1"))
-                .andExpect(jsonPath("$.messages[3].role").value("tool"))
-                .andExpect(jsonPath("$.messages[3].tool_call_id").value("call_1"))
-                .andExpect(jsonPath("$.messages[3].content").value("result of Q1"))
-                .andRespond(withSuccess(FINAL_REPLY, MediaType.APPLICATION_JSON));
-        List<String> executed = new ArrayList<>();
-
-        String answer = client.complete("s", "u", List.of(OVERPASS), (name, arguments) -> {
-            executed.add(name + ":" + arguments);
-            return "result of Q1";
-        }, 3);
-
-        assertThat(answer).isEqualTo("done");
-        assertThat(executed).containsExactly("overpass:{\"query\":\"Q1\"}");
-        server.verify();
-    }
-
-    /** The endpoint (Bedrock behind a proxy) refuses a history with tool calls when `tools` is missing. */
-    @Test
-    void toolsAreStillDeclaredOnceTheToolCallBudgetIsSpent() {
-        server.expect(requestTo("https://llm.test/v1/chat/completions"))
-                .andExpect(jsonPath("$.tools").exists())
-                .andRespond(withSuccess(TOOL_CALL_REPLY, MediaType.APPLICATION_JSON));
-        server.expect(requestTo("https://llm.test/v1/chat/completions"))
-                .andExpect(jsonPath("$.tools").exists())
-                .andRespond(withSuccess(FINAL_REPLY, MediaType.APPLICATION_JSON));
-
-        assertThat(client.complete("s", "u", List.of(OVERPASS), (name, arguments) -> "r", 1)).isEqualTo("done");
-        server.verify();
-    }
-
-    @Test
-    void aModelThatKeepsCallingToolsAfterTheBudgetGetsALimitMessageThenAnError() {
-        // budget 1: one call runs, then two more rounds are answered with "limit reached", then the client gives up
-        for (int i = 0; i < 4; i++) {
-            server.expect(requestTo("https://llm.test/v1/chat/completions"))
-                    .andRespond(withSuccess(TOOL_CALL_REPLY, MediaType.APPLICATION_JSON));
-        }
-        List<String> executed = new ArrayList<>();
-
-        assertThatThrownBy(() -> client.complete("s", "u", List.of(OVERPASS), (name, arguments) -> {
-            executed.add(arguments);
-            return "r";
-        }, 1)).isInstanceOfSatisfying(SearchException.class,
-                e -> assertThat(e.code()).isEqualTo(SearchErrorCode.SERVICE_UNAVAILABLE));
-
-        assertThat(executed).hasSize(1);
-        server.verify();
-    }
-
-    @Test
-    void aToolCallBeyondTheBudgetIsNotExecuted() {
-        String twoCalls = """
-                {"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[
-                  {"id":"a","type":"function","function":{"name":"overpass","arguments":"{}"}},
-                  {"id":"b","type":"function","function":{"name":"overpass","arguments":"{}"}}]}}]}""";
-        server.expect(requestTo("https://llm.test/v1/chat/completions"))
-                .andRespond(withSuccess(twoCalls, MediaType.APPLICATION_JSON));
-        server.expect(requestTo("https://llm.test/v1/chat/completions"))
-                .andExpect(jsonPath("$.messages[4].tool_call_id").value("b"))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("limit")))
-                .andRespond(withSuccess(FINAL_REPLY, MediaType.APPLICATION_JSON));
-        List<String> executed = new ArrayList<>();
-
-        client.complete("s", "u", List.of(OVERPASS), (name, arguments) -> {
-            executed.add(arguments);
-            return "r";
-        }, 1);
-
-        assertThat(executed).hasSize(1);
-        server.verify();
-    }
-
-    @Test
-    void anAnswerWithToolCallsWhenNoToolWasOfferedIsReportedAsServiceUnavailable() {
-        server.expect(requestTo("https://llm.test/v1/chat/completions"))
-                .andRespond(withSuccess(TOOL_CALL_REPLY, MediaType.APPLICATION_JSON));
-
-        assertThatThrownBy(() -> client.complete("s", "u")).isInstanceOfSatisfying(SearchException.class,
-                e -> assertThat(e.code()).isEqualTo(SearchErrorCode.SERVICE_UNAVAILABLE));
-    }
 
     private List<String> logsOf(Level level, Runnable action) {
         Logger logger = (Logger) LoggerFactory.getLogger(LlmChatClient.class);
@@ -275,33 +225,36 @@ class LlmChatClientTest {
     }
 
     @Test
-    void requestsAndToolCallsAreLoggedAtInfoLevelWithoutTheirContent() {
-        server.expect(requestTo("https://llm.test/v1/chat/completions"))
-                .andRespond(withSuccess(TOOL_CALL_REPLY, MediaType.APPLICATION_JSON));
+    void requestsAreLoggedAtInfoLevelWithoutTheirContent() {
         server.expect(requestTo("https://llm.test/v1/chat/completions"))
                 .andRespond(withSuccess(FINAL_REPLY, MediaType.APPLICATION_JSON));
 
-        List<String> messages = logsOf(Level.INFO,
-                () -> client.complete("s", "secret sentence", List.of(OVERPASS), (name, arguments) -> "r", 3));
+        List<String> messages = logsOf(Level.INFO, () -> client.complete("s", "secret sentence"));
 
         assertThat(messages).anySatisfy(m -> assertThat(m).contains("LLM request 1"));
-        assertThat(messages).anySatisfy(m -> assertThat(m).contains("LLM request 2"));
-        assertThat(messages).anySatisfy(m -> assertThat(m).contains("asked for tool overpass"));
-        assertThat(messages).noneSatisfy(m -> assertThat(m).contains("secret sentence").contains("Q1"));
+        assertThat(messages).noneSatisfy(m -> assertThat(m).contains("secret sentence"));
+        assertThat(messages).noneSatisfy(m -> assertThat(m).contains("done"));
     }
 
     @Test
-    void toolArgumentsAndTheRawReplyAreLoggedAtDebugLevel() {
-        server.expect(requestTo("https://llm.test/v1/chat/completions"))
-                .andRespond(withSuccess(TOOL_CALL_REPLY, MediaType.APPLICATION_JSON));
+    void theRawReplyIsLoggedAtDebugLevel() {
         server.expect(requestTo("https://llm.test/v1/chat/completions"))
                 .andRespond(withSuccess(FINAL_REPLY, MediaType.APPLICATION_JSON));
 
-        List<String> messages = logsOf(Level.DEBUG,
-                () -> client.complete("s", "u", List.of(OVERPASS), (name, arguments) -> "tool says pong", 3));
+        List<String> messages = logsOf(Level.DEBUG, () -> client.complete("s", "u"));
 
-        assertThat(messages).anySatisfy(m -> assertThat(m).contains("Q1"));
-        assertThat(messages).anySatisfy(m -> assertThat(m).contains("tool says pong"));
         assertThat(messages).anySatisfy(m -> assertThat(m).contains("LLM reply").contains("done"));
+    }
+
+    /** FR-002: no tool is ever declared to the model. */
+    @Test
+    void theRequestDeclaresNoTool() {
+        server.expect(requestTo("https://llm.test/v1/chat/completions"))
+                .andExpect(jsonPath("$.tools").doesNotExist())
+                .andRespond(withSuccess(FINAL_REPLY, MediaType.APPLICATION_JSON));
+
+        client.complete("s", "u");
+
+        server.verify();
     }
 }

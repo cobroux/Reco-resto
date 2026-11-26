@@ -1,3 +1,5 @@
+import { DataProvider, PhotoAttribution } from '../search/search-result';
+
 /** Opening range of one day, local time of the restaurant, "HH:mm". A close before open ends after midnight. */
 export interface OpeningRange {
   readonly open: string;
@@ -34,6 +36,14 @@ export interface Restaurant {
   readonly dish?: Dish;
   /** Postal address when known, shown under the name (added at the request of the team; not in spec 003). */
   readonly address?: string;
+  /** Website of the restaurant (spec 008). */
+  readonly website?: string;
+  /** Authors of the photo, shown with it (spec 008, FR-014). */
+  readonly photoAttributions?: readonly PhotoAttribution[];
+  /** The photo on Google Maps (spec 008). */
+  readonly photoSourceUri?: string;
+  /** Data providers shown with "Google Maps" (spec 008, FR-014). */
+  readonly attributions?: readonly DataProvider[];
   /** Menu shown on the back of the card (spec 004). Absent or empty: no "Menu" section. */
   readonly menu?: readonly MenuItem[];
   /** Carried for a future "Appeler" action; not displayed (plan D-04-8). */

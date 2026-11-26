@@ -1,0 +1,3 @@
+Voici ce que j'ai compris de la demande :
+{"understood":true,"outsideFrance":false,"criteria":{"places":["Opéra, Paris"],"moment":"now"},"centers":[{"name":"Opéra, Paris","latitude":48.8708,"longitude":2.3322}]}
+J'espère que cela vous aidera {bon appétit} !

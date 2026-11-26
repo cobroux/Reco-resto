@@ -1,0 +1,1 @@
+{"understood":true,"outsideFrance":false,"criteria":{"places":["Opéra, Paris"],"moment":"now"}}

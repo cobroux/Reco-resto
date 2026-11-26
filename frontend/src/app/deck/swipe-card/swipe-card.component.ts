@@ -9,6 +9,7 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { EnrichedPhoto } from '../../enrichment/card-enrichment';
 import { Restaurant } from '../../restaurant/restaurant';
 import { DECK_TEXTS } from '../deck.texts';
 import { formatDistance } from '../format/distance';
@@ -53,6 +54,8 @@ export class SwipeCardComponent {
   readonly restaurant = input.required<Restaurant>();
   readonly targetDateTime = input.required<string>();
   readonly disabled = input(false);
+  /** Photo found from the restaurant website (spec 007), used only when the data source has none (T4). */
+  readonly enrichment = input<EnrichedPhoto | undefined>(undefined);
   /** A reaction was chosen (swipe or `leave()`); the card starts flying off. */
   readonly swiped = output<Direction>();
   /** The card has flown off: the reaction can be applied (D18). */
@@ -62,6 +65,21 @@ export class SwipeCardComponent {
   private leaveTimer?: ReturnType<typeof setTimeout>;
 
   protected readonly texts = DECK_TEXTS;
+  /** Photo address that failed to load; the card then shows the tablecloth (spec 008, FR-010). */
+  private readonly failedPhoto = signal<string | null>(null);
+  /** Effective photo (spec 007 data-model): the data-source photo always wins over the website one. */
+  private readonly shownPhoto = computed<EnrichedPhoto | undefined>(() => {
+    const url = this.restaurant().photoUrl;
+    return url ? { url } : this.enrichment();
+  });
+  protected readonly photo = computed(() => {
+    const url = this.shownPhoto()?.url;
+    return url && url !== this.failedPhoto() ? url : undefined;
+  });
+  /** Unsplash credit, only while its photo is shown (spec 007, FR-015, T41). */
+  protected readonly credit = computed(() =>
+    this.photo() ? this.shownPhoto()?.credit : undefined,
+  );
   protected readonly distance = computed(() => formatDistance(this.restaurant().distanceMeters));
   protected readonly closingTime = computed(() =>
     closingTimeAt(this.restaurant().weeklyHours, this.targetDateTime()),
@@ -111,6 +129,10 @@ export class SwipeCardComponent {
     this.swiped.emit(direction);
     this.leaveTimer = setTimeout(() => this.left.emit(direction), this.animationMs);
   }
+  protected onPhotoError(url: string): void {
+    this.failedPhoto.set(url);
+  }
+
   protected readonly likeOpacity = computed(() => this.stamp(this.dx()));
   protected readonly nopeOpacity = computed(() => this.stamp(-this.dx()));
 
@@ -137,7 +159,8 @@ export class SwipeCardComponent {
     if (this.leaving() || this.disabled() || event.button !== 0 || event.isPrimary === false) {
       return;
     }
-    // Buttons handle their own click: they never start a drag or a tap.
+    // Buttons and links (flip, Itinéraire; Google attribution of spec 008, website link and Unsplash credit of
+    // spec 007) handle their own click: they never start a drag or a tap (capturing the pointer would steal it).
     if ((event.target as Element | null)?.closest?.('button, a')) {
       return;
     }

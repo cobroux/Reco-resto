@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { vi } from 'vitest';
+import { EnrichedPhoto } from '../../enrichment/card-enrichment';
 import { Restaurant } from '../../restaurant/restaurant';
 import { DECK_TEXTS } from '../deck.texts';
 import { RoutePreviewService } from '../route-preview.service';
@@ -129,6 +131,323 @@ describe('SwipeCardComponent', () => {
     it('hides the price chip when the price level is unknown', () => {
       const chips = [...root.querySelectorAll('.chip')].map((c) => c.textContent?.trim());
       expect(chips).toEqual(['Française']);
+    });
+  });
+
+  describe('Google Places data (spec 008, T21-T24, T30)', () => {
+    it('shows the photo when the restaurant has a photo address (T21)', async () => {
+      await create({ ...FULL, photoUrl: '/api/photos/place1/photo1' });
+
+      expect(root.querySelector('img.photo')?.getAttribute('src')).toBe(
+        '/api/photos/place1/photo1',
+      );
+      expect(root.querySelector('[data-testid="tablecloth"]')).toBeNull();
+    });
+
+    it('falls back to the tablecloth when the photo cannot be loaded (FR-010, T30)', async () => {
+      await create({ ...FULL, photoUrl: '/api/photos/place1/broken' });
+
+      root.querySelector('img.photo')?.dispatchEvent(new Event('error'));
+      await fixture.whenStable();
+
+      expect(root.querySelector('img.photo')).toBeNull();
+      expect(root.querySelector('[data-testid="tablecloth"]')).not.toBeNull();
+    });
+
+    it('shows the photo of the next restaurant after a failed one', async () => {
+      await create({ ...FULL, photoUrl: '/api/photos/place1/broken' });
+      root.querySelector('img.photo')?.dispatchEvent(new Event('error'));
+      await fixture.whenStable();
+
+      fixture.componentRef.setInput('restaurant', {
+        ...FULL,
+        id: 'r3',
+        photoUrl: '/api/photos/place2/ok',
+      });
+      await fixture.whenStable();
+
+      expect(root.querySelector('img.photo')?.getAttribute('src')).toBe('/api/photos/place2/ok');
+    });
+
+    it('shows the tablecloth when there is no photo (T22)', async () => {
+      await create(BARE);
+
+      expect(root.querySelector('img.photo')).toBeNull();
+      expect(root.querySelector('[data-testid="tablecloth"]')).not.toBeNull();
+    });
+
+    it('shows no opening status without opening hours (T23)', async () => {
+      await create({ ...BARE, weeklyHours: [[], [], [], [], [], [], []] });
+
+      expect(text()).not.toContain(DECK_TEXTS.openUntil(''));
+    });
+
+    it('shows no price chip without price level (T24)', async () => {
+      await create(BARE);
+
+      expect(root.querySelector('.chip.price')).toBeNull();
+    });
+  });
+
+  describe('Google Maps attribution (spec 008, FR-014, T40, T41, SC-007)', () => {
+    const attribution = () => root.querySelector('.hero [data-testid="google-attribution"]');
+
+    it('shows the untranslated "Google Maps" text on the photo area', async () => {
+      await create(FULL);
+
+      const label = root.querySelector('.hero [data-testid="google-maps"]');
+      expect(label?.textContent?.trim()).toBe(DECK_TEXTS.googleMaps);
+      expect(DECK_TEXTS.googleMaps).toBe('Google Maps');
+      expect(label?.getAttribute('translate')).toBe('no');
+    });
+
+    it('shows it on a card with the tablecloth too', async () => {
+      await create(BARE);
+
+      expect(root.querySelector('[data-testid="tablecloth"]')).not.toBeNull();
+      expect(attribution()?.textContent).toContain('Google Maps');
+    });
+
+    it('shows the photo author(s) under it, linked to their page (T41)', async () => {
+      await create({
+        ...FULL,
+        photoAttributions: [
+          { displayName: 'Jane Doe', uri: 'https://maps.google.com/contrib/1' },
+          { displayName: 'John Roe' },
+        ],
+      });
+
+      const authors = root.querySelector('[data-testid="photo-authors"]') as HTMLElement;
+      expect(authors).not.toBeNull();
+      expect(
+        root.querySelector('[data-testid="google-maps"]')?.compareDocumentPosition(authors),
+      ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+      const link = authors.querySelector('a') as HTMLAnchorElement;
+      expect(link.textContent?.trim()).toBe('Jane Doe');
+      expect(link.getAttribute('href')).toBe('https://maps.google.com/contrib/1');
+      expect(authors.textContent).toContain('John Roe');
+    });
+
+    it('lets an attribution link be clicked: a press on it starts no drag', async () => {
+      await create({
+        ...FULL,
+        photoAttributions: [{ displayName: 'Jane Doe', uri: 'https://maps.google.com/contrib/1' }],
+      });
+      const link = root.querySelector('[data-testid="photo-authors"] a') as HTMLElement;
+
+      link.dispatchEvent(pointer('pointerdown', 100, 100));
+      card().dispatchEvent(pointer('pointermove', 250, 100));
+      card().dispatchEvent(pointer('pointerup', 250, 100));
+      await fixture.whenStable();
+
+      expect(swipes).toEqual([]);
+      expect(card().style.transform).toBe('');
+    });
+
+    it('shows no author line without photo attribution', async () => {
+      await create(FULL);
+
+      expect(root.querySelector('[data-testid="photo-authors"]')).toBeNull();
+    });
+
+    it('shows the data providers with "Google Maps"', async () => {
+      await create({
+        ...FULL,
+        attributions: [{ provider: 'Some Provider', providerUri: 'https://provider.example' }],
+      });
+
+      const providers = attribution()?.querySelector('[data-testid="data-providers"]');
+      expect(providers?.textContent).toContain('Some Provider');
+      expect(providers?.querySelector('a')?.getAttribute('href')).toBe('https://provider.example');
+    });
+  });
+
+  describe('website photo (spec 007, T5, T8, T9, T10, T21, PO-12)', () => {
+    const ENRICHED = { url: 'https://cdn.example/salle.jpg' };
+
+    async function setEnrichment(enrichment: EnrichedPhoto | undefined): Promise<void> {
+      fixture.componentRef.setInput('enrichment', enrichment);
+      await fixture.whenStable();
+    }
+
+    it('shows the enrichment photo without referrer when the restaurant has no photo (T5, PO-12)', async () => {
+      await create(BARE);
+      await setEnrichment(ENRICHED);
+
+      const img = root.querySelector('img.photo');
+      expect(img?.getAttribute('src')).toBe(ENRICHED.url);
+      expect(img?.getAttribute('referrerpolicy')).toBe('no-referrer');
+      expect(root.querySelector('[data-testid="tablecloth"]')).toBeNull();
+    });
+
+    it('keeps the data-source photo over the enrichment photo (T4)', async () => {
+      await create(FULL);
+      await setEnrichment(ENRICHED);
+
+      expect(root.querySelector('img.photo')?.getAttribute('src')).toBe('stub/restaurant.svg');
+    });
+
+    it('shows the tablecloth without enrichment photo (T10)', async () => {
+      await create(BARE);
+
+      expect(root.querySelector('img.photo')).toBeNull();
+      expect(root.querySelector('[data-testid="tablecloth"]')).not.toBeNull();
+    });
+
+    it('falls back to the tablecloth when the enrichment photo cannot be loaded (T9, 008 T063)', async () => {
+      await create(BARE);
+      await setEnrichment(ENRICHED);
+
+      root.querySelector('img.photo')?.dispatchEvent(new Event('error'));
+      await fixture.whenStable();
+
+      expect(root.querySelector('img.photo')).toBeNull();
+      expect(root.querySelector('[data-testid="tablecloth"]')).not.toBeNull();
+    });
+
+    it('keeps the drag going when the photo arrives during it (T21)', async () => {
+      await create(BARE);
+      card().dispatchEvent(pointer('pointerdown', 100, 100));
+      card().dispatchEvent(pointer('pointermove', 160, 100));
+      await fixture.whenStable();
+
+      await setEnrichment(ENRICHED);
+
+      expect(card().style.transform).toContain('translate(60px');
+      expect(root.querySelector('img.photo')?.getAttribute('src')).toBe(ENRICHED.url);
+      card().dispatchEvent(pointer('pointermove', 250, 100));
+      card().dispatchEvent(pointer('pointerup', 250, 100));
+      await fixture.whenStable();
+      expect(swipes).toEqual(['right']);
+    });
+  });
+
+  describe('website link (spec 007, US2, FR-007, FR-008, T13, T14, T16, PO-14)', () => {
+    const WEBSITE = 'https://baan-thai.example/';
+    const link = () => root.querySelector('.hero a.website') as HTMLAnchorElement | null;
+
+    it('shows a link icon to the website at the top-left of the photo area, opening a new tab (T13)', async () => {
+      await create({ ...FULL, website: WEBSITE });
+
+      expect(link()).not.toBeNull();
+      expect(link()!.getAttribute('href')).toBe(WEBSITE);
+      expect(link()!.getAttribute('target')).toBe('_blank');
+      expect(link()!.getAttribute('rel')).toBe('noopener noreferrer');
+      expect(link()!.getAttribute('draggable')).toBe('false');
+      expect(link()!.getAttribute('aria-label')).toBe(DECK_TEXTS.website);
+      expect(DECK_TEXTS.website).toBe('Site du restaurant');
+      expect(link()!.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+      expect(link()!.closest('[data-testid="google-attribution"]')).toBeNull();
+    });
+
+    it('shows no link without website (T14)', async () => {
+      await create(FULL);
+
+      expect(link()).toBeNull();
+    });
+
+    it('starts no drag and no swipe from a press on the link (T16)', async () => {
+      await create({ ...FULL, website: WEBSITE });
+      const capture = vi.fn();
+      card().setPointerCapture = capture;
+
+      link()!.dispatchEvent(pointer('pointerdown', 100, 100));
+      card().dispatchEvent(pointer('pointermove', 250, 100));
+      card().dispatchEvent(pointer('pointerup', 250, 100));
+      await fixture.whenStable();
+
+      expect(capture).not.toHaveBeenCalled();
+      expect(card().style.transform).toBe('');
+      expect(swipes).toEqual([]);
+    });
+
+    it('emits no reaction on a click (FR-008)', async () => {
+      await create({ ...FULL, website: WEBSITE });
+      link()!.addEventListener('click', (event) => event.preventDefault());
+
+      link()!.click();
+      await fixture.whenStable();
+
+      expect(swipes).toEqual([]);
+    });
+  });
+
+  describe('Unsplash credit (spec 007, FR-015, T40, T41)', () => {
+    const CREDIT = {
+      photographerName: 'Jane Doe',
+      photographerUrl: 'https://unsplash.com/@janedoe?utm_source=reco_resto&utm_medium=referral',
+      unsplashUrl: 'https://unsplash.com/?utm_source=reco_resto&utm_medium=referral',
+    };
+    const credit = () =>
+      root.querySelector('.hero [data-testid="unsplash-credit"]') as HTMLElement | null;
+
+    async function createWith(
+      enrichment: EnrichedPhoto,
+      restaurant: Restaurant = BARE,
+    ): Promise<void> {
+      await create(restaurant);
+      fixture.componentRef.setInput('enrichment', enrichment);
+      await fixture.whenStable();
+    }
+
+    it('shows "Photo : <photographer> / Unsplash" with both links in a new tab (T40)', async () => {
+      await createWith({ url: 'https://images.unsplash.com/photo-1', credit: CREDIT });
+
+      expect(credit()?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+        `${DECK_TEXTS.photoBy} Jane Doe / ${DECK_TEXTS.unsplash}`,
+      );
+      expect(DECK_TEXTS.photoBy).toBe('Photo :');
+      const [photographer, unsplash] = [...credit()!.querySelectorAll('a')];
+      expect(photographer.textContent?.trim()).toBe('Jane Doe');
+      expect(photographer.getAttribute('href')).toBe(CREDIT.photographerUrl);
+      expect(unsplash.textContent?.trim()).toBe('Unsplash');
+      expect(unsplash.getAttribute('href')).toBe(CREDIT.unsplashUrl);
+      for (const a of [photographer, unsplash]) {
+        expect(a.getAttribute('target')).toBe('_blank');
+        expect(a.getAttribute('rel')).toBe('noopener noreferrer');
+        expect(a.getAttribute('draggable')).toBe('false');
+      }
+    });
+
+    it('keeps the credit apart from the Google attribution and the website link', async () => {
+      await createWith(
+        { url: 'https://images.unsplash.com/photo-1', credit: CREDIT },
+        { ...BARE, website: 'https://x.example/' },
+      );
+
+      expect(credit()!.closest('[data-testid="google-attribution"]')).toBeNull();
+      expect(credit()!.contains(root.querySelector('a.website'))).toBe(false);
+    });
+
+    it('starts no drag nor reaction from a press or a click on a credit link (T40)', async () => {
+      await createWith({ url: 'https://images.unsplash.com/photo-1', credit: CREDIT });
+      for (const a of credit()!.querySelectorAll('a')) {
+        a.addEventListener('click', (event) => event.preventDefault());
+        a.dispatchEvent(pointer('pointerdown', 100, 100));
+        card().dispatchEvent(pointer('pointermove', 250, 100));
+        card().dispatchEvent(pointer('pointerup', 250, 100));
+        a.click();
+      }
+      await fixture.whenStable();
+
+      expect(card().style.transform).toBe('');
+      expect(swipes).toEqual([]);
+    });
+
+    it('shows no credit for a website photo (T41)', async () => {
+      await createWith({ url: 'https://cdn.example/salle.jpg' });
+
+      expect(credit()).toBeNull();
+    });
+
+    it('shows no credit when the data-source photo is shown, nor when the photo failed', async () => {
+      await createWith({ url: 'https://images.unsplash.com/photo-1', credit: CREDIT }, FULL);
+      expect(credit()).toBeNull();
+
+      await createWith({ url: 'https://images.unsplash.com/photo-1', credit: CREDIT });
+      root.querySelector('img.photo')?.dispatchEvent(new Event('error'));
+      await fixture.whenStable();
+      expect(credit()).toBeNull();
     });
   });
 

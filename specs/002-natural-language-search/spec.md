@@ -71,7 +71,7 @@ When Nappe cannot answer, Philipe gets a clear message that tells him what to do
 
 - The sentence mixes AND and OR ("asiatique ou italien, et végétarien"): the criteria keep the grouping expressed by the user.
 - The sentence contains several places (for example "entre Opéra et Châtelet", "à Montmartre ou près de la gare du Nord"): the search runs around every place named and the results are merged into one set, ranked by relevance (see FR-015).
-- The sentence asks for a budget or a specific dish: these are not search criteria in the MVP; they are ignored, and the rest of the sentence is used.
+- The sentence asks for a budget or a specific dish: these are not search criteria in the MVP; they are ignored, and the rest of the sentence is used. *(Amended 2026-11-26: a dish now gives the cuisines that serve it, see FR-003.)*
 - The moment is in the past ("hier soir"): handled like a sentence that cannot be understood (invitation to rephrase).
 - Restaurants closed at the targeted moment are never returned for the deck.
 - Restaurants with no known address are never returned for the deck, since no route can be offered (see FR-016).
@@ -82,7 +82,7 @@ When Nappe cannot answer, Philipe gets a clear message that tells him what to do
 
 - **FR-001**: The system MUST extract from the sentence these criteria when present: type of cuisine, diet, place, moment, and a distance limit.
 - **FR-002**: The system MUST distinguish AND from OR between criteria, as expressed in the sentence.
-- **FR-003**: The system MUST NOT use budget or a specific dish as search criteria.
+- **FR-003**: The system MUST NOT use budget or a specific dish as search criteria. **Amended 2026-11-26 (product owner)**: a specific dish or a craving (for example "frites", "donburi", "épicé") is turned into the cuisine types most likely to serve it (spec 008 closed list); the budget is still ignored.
 - **FR-004**: The system MUST search restaurants within a radius around the place; the default radius MUST be 2.5 km and MUST be configurable without code change.
 - **FR-005**: A distance expressed in the sentence MUST replace the default radius for that search.
 - **FR-006**: When the sentence has no place, the system MUST request the device position and use it; if the position is refused or unavailable, the system MUST ask the user to specify a place.

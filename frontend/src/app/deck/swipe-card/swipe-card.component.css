@@ -82,6 +82,92 @@
   font-size: 13px;
 }
 
+/* Google attribution (spec 008, FR-014, D15): discreet text on the photo, bottom-right so the
+   top-left corner stays free for the website link of spec 007. "Google Maps" is 12 px, weight 400,
+   never wrapped (Google Maps Platform terms, research R6); the photo authors go in smaller text under it.
+   Merge with spec 004: the flip button "↻" also sits bottom-right (44 px at 14 px), so the attribution is
+   moved just left of it (14 + 44 + 8 = 66 px) instead of under it; placement to validate by the product owner. */
+.attribution {
+  position: absolute;
+  right: 66px;
+  bottom: 14px;
+  max-width: calc(100% - 192px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #23202e;
+  line-height: 1.2;
+  text-align: right;
+}
+
+.google-maps {
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.providers,
+.authors {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0 6px;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.attribution a,
+.credit a {
+  color: inherit;
+}
+
+/* Website link icon (spec 007, FR-007, PO-14): top-left of the photo area, round like the distance pill. */
+.website {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--color-white);
+  color: #23202e;
+  cursor: pointer;
+}
+
+.website svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+/* Unsplash credit (spec 007, FR-015): top-right, the only free corner (link top-left, distance
+   bottom-left, Google attribution bottom-right); same discreet look as the Google attribution. */
+.credit {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  max-width: calc(100% - 74px);
+  margin: 0;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #23202e;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.2;
+  text-align: right;
+}
+
 /* Drag feedback: the whole photo is tinted and a large tilted stamp sits in its centre, so the
    reaction about to be chosen is readable at a glance (replaces the small corner pill). */
 .stamp {

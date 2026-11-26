@@ -1,0 +1,80 @@
+{
+  "_comment": "FICTITIOUS DEVELOPMENT DATA - NOT real Google Places data. Shape of a Nearby Search (New) answer (spec 008, research R4).",
+  "places": [
+    {
+      "id": "FIXTURE_place_dragon_or",
+      "displayName": {"text": "[FICTIF] Dragon d'Or", "languageCode": "fr"},
+      "location": {"latitude": 48.8715, "longitude": 2.3305},
+      "shortFormattedAddress": "1 Rue Exemple, Paris",
+      "types": ["chinese_restaurant", "asian_restaurant", "restaurant", "food", "point_of_interest", "establishment"],
+      "primaryType": "chinese_restaurant",
+      "primaryTypeDisplayName": {"text": "Restaurant chinois", "languageCode": "fr"},
+      "businessStatus": "OPERATIONAL",
+      "photos": [
+        {
+          "name": "places/FIXTURE_place_dragon_or/photos/FIXTURE_photo_1",
+          "widthPx": 1200,
+          "heightPx": 800,
+          "authorAttributions": [
+            {"displayName": "[FICTIF] Auteur Un", "uri": "https://example.invalid/author-1", "photoUri": "https://example.invalid/author-1.png"}
+          ],
+          "googleMapsUri": "https://example.invalid/photo-1"
+        }
+      ],
+      "attributions": [{"provider": "[FICTIF] Fournisseur", "providerUri": "https://example.invalid/provider"}],
+      "regularOpeningHours": {
+        "periods": [
+          {"open": {"day": 0, "hour": 11, "minute": 30}, "close": {"day": 0, "hour": 23, "minute": 0}},
+          {"open": {"day": 1, "hour": 11, "minute": 30}, "close": {"day": 1, "hour": 23, "minute": 0}},
+          {"open": {"day": 2, "hour": 11, "minute": 30}, "close": {"day": 2, "hour": 23, "minute": 0}},
+          {"open": {"day": 3, "hour": 11, "minute": 30}, "close": {"day": 3, "hour": 23, "minute": 0}},
+          {"open": {"day": 4, "hour": 11, "minute": 30}, "close": {"day": 4, "hour": 23, "minute": 0}},
+          {"open": {"day": 5, "hour": 11, "minute": 30}, "close": {"day": 6, "hour": 1, "minute": 0}},
+          {"open": {"day": 6, "hour": 11, "minute": 30}, "close": {"day": 0, "hour": 1, "minute": 0}}
+        ]
+      },
+      "priceLevel": "PRICE_LEVEL_MODERATE",
+      "websiteUri": "https://example.invalid/dragon-or",
+      "nationalPhoneNumber": "01 00 00 00 01",
+      "servesVegetarianFood": true
+    },
+    {
+      "id": "FIXTURE_place_trattoria",
+      "displayName": {"text": "[FICTIF] Trattoria Esempio", "languageCode": "fr"},
+      "location": {"latitude": 48.8698, "longitude": 2.3340},
+      "shortFormattedAddress": "2 Rue Exemple, Paris",
+      "types": ["italian_restaurant", "restaurant", "food", "point_of_interest", "establishment"],
+      "primaryType": "italian_restaurant",
+      "primaryTypeDisplayName": {"text": "Restaurant italien", "languageCode": "fr"},
+      "businessStatus": "OPERATIONAL",
+      "regularOpeningHours": {
+        "periods": [
+          {"open": {"day": 0, "hour": 0, "minute": 0}}
+        ]
+      },
+      "priceLevel": "PRICE_LEVEL_EXPENSIVE",
+      "nationalPhoneNumber": "01 00 00 00 02"
+    },
+    {
+      "id": "FIXTURE_place_bistrot",
+      "displayName": {"text": "[FICTIF] Bistrot Exemple", "languageCode": "fr"},
+      "location": {"latitude": 48.8720, "longitude": 2.3350},
+      "shortFormattedAddress": "3 Rue Exemple, Paris",
+      "types": ["french_restaurant", "restaurant", "food", "point_of_interest", "establishment"],
+      "primaryType": "french_restaurant",
+      "primaryTypeDisplayName": {"text": "Restaurant français", "languageCode": "fr"},
+      "businessStatus": "OPERATIONAL",
+      "websiteUri": "https://example.invalid/bistrot"
+    },
+    {
+      "id": "FIXTURE_place_closed",
+      "displayName": {"text": "[FICTIF] Ancien Restaurant", "languageCode": "fr"},
+      "location": {"latitude": 48.8700, "longitude": 2.3310},
+      "shortFormattedAddress": "4 Rue Exemple, Paris",
+      "types": ["restaurant", "food", "point_of_interest", "establishment"],
+      "primaryType": "restaurant",
+      "primaryTypeDisplayName": {"text": "Restaurant", "languageCode": "fr"},
+      "businessStatus": "CLOSED_PERMANENTLY"
+    }
+  ]
+}
