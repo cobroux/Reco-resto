@@ -233,6 +233,30 @@ class SearchServiceTest {
         verify(google, never()).searchText(eq("c"), any(), anyDouble(), anyList());
     }
 
+    /** PR #18 review: an empty second search must not discard the candidates of the first one. */
+    @Test
+    void anEmptySecondSearchKeepsTheCandidatesOfTheFirst() {
+        googleFinds(2);
+        when(google.searchText(eq("b"), any(), anyDouble(), anyList())).thenReturn(new ArrayList<>());
+        when(llm.chat(anyList(), anyList())).thenReturn(toolCall("{\"query\":\"a\"}"), toolCall("{\"query\":\"b\"}"),
+                answer("{\"picks\":[{\"id\":\"r2\",\"reason\":\"ok\"}]}"));
+
+        assertThat(names(search("a"))).containsExactly("Resto 2", "Resto 1");
+    }
+
+    /** The tool price names come from the single Google price table. */
+    @Test
+    void everyGooglePriceLevelCanBeAskedByTheModel() {
+        googleFinds(1);
+        when(llm.chat(anyList(), anyList())).thenReturn(
+                toolCall("{\"query\":\"a\",\"price_levels\":[\"moderate\",\"VERY_EXPENSIVE\"]}"),
+                answer("{\"picks\":[]}"));
+
+        search("a");
+
+        verify(google).searchText("a", HERE, 2500.0, List.of("PRICE_LEVEL_MODERATE", "PRICE_LEVEL_VERY_EXPENSIVE"));
+    }
+
     @Test
     void noCandidateIsNoResult() {
         when(google.searchText(anyString(), any(), anyDouble(), anyList())).thenReturn(new ArrayList<>());

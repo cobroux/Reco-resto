@@ -9,6 +9,7 @@ import hr.emocio.recoresto.search.criteria.MomentResolver;
 import hr.emocio.recoresto.search.criteria.SearchCriteria;
 import hr.emocio.recoresto.search.google.GooglePlace;
 import hr.emocio.recoresto.search.google.GooglePlaceMapper;
+import hr.emocio.recoresto.search.google.GooglePlaceTypes;
 import hr.emocio.recoresto.search.google.GooglePlacesClient;
 import hr.emocio.recoresto.search.llm.JsonAnswers;
 import hr.emocio.recoresto.search.llm.LlmChatClient;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -60,12 +62,13 @@ public class SearchService {
     private static final int MAX_REASON_LENGTH = 120;
     private static final String TOOL_NAME = "search_restaurants";
 
-    private static final Map<String, String> PRICE_LEVELS = Map.of(
-            "inexpensive", "PRICE_LEVEL_INEXPENSIVE",
-            "moderate", "PRICE_LEVEL_MODERATE",
-            "expensive", "PRICE_LEVEL_EXPENSIVE",
-            "very_expensive", "PRICE_LEVEL_VERY_EXPENSIVE");
-    private static final Set<String> DIETS = Set.of("vegetarian", "vegan", "halal");
+    private static final String GOOGLE_PRICE_PREFIX = "PRICE_LEVEL_";
+    /** Tool price names ("inexpensive"...) to Google levels, from the single table of {@link GooglePlaceMapper}. */
+    private static final Map<String, String> PRICE_LEVELS = GooglePlaceMapper.PRICE_LEVELS.keySet().stream()
+            .collect(Collectors.toMap(level -> level.substring(GOOGLE_PRICE_PREFIX.length()).toLowerCase(Locale.ROOT),
+                    level -> level));
+    /** The diets Google can state, from the single table of {@link GooglePlaceTypes}. */
+    private static final Set<String> DIETS = GooglePlaceTypes.DIET_TYPES.keySet();
 
     private static final DateTimeFormatter NOW_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm (EEEE)",
             Locale.ENGLISH);
@@ -104,13 +107,13 @@ public class SearchService {
                             "query", Map.of("type", "string",
                                     "description", "Short French text of what to eat, or \"restaurant\""),
                             "price_levels", Map.of("type", "array", "items", Map.of("type", "string", "enum",
-                                    List.of("inexpensive", "moderate", "expensive", "very_expensive"))),
+                                    sorted(PRICE_LEVELS.keySet()))),
                             "open_at", Map.of("type", "string",
                                     "description", "\"now\" or a local date-time such as 2026-11-28T12:30"),
                             "radius_m", Map.of("type", "integer", "description", "Search radius in meters"),
                             "walking_minutes", Map.of("type", "integer", "description", "Travel time on foot"),
                             "diets", Map.of("type", "array", "items", Map.of("type", "string", "enum",
-                                    List.of("vegetarian", "vegan", "halal")))),
+                                    sorted(DIETS)))),
                     "required", List.of("query")))));
 
     /** One run of the tool: what was searched, and the candidates in backend order. */
@@ -173,9 +176,13 @@ public class SearchService {
                     String result;
                     if (toolCalls < MAX_TOOL_CALLS && TOOL_NAME.equals(call.path("function").path("name").asString())) {
                         toolCalls++;
-                        log.info("Agent tool call {}: {}", toolCalls, arguments);
-                        last = runTool(arguments, position);
-                        result = forModel(last);
+                        log.debug("Agent tool call {}: {}", toolCalls, arguments);
+                        ToolRun run = runTool(arguments, position);
+                        // A new search replaces the previous one only when it found something (never lose results).
+                        if (last == null || !run.candidates().isEmpty()) {
+                            last = run;
+                        }
+                        result = forModel(run);
                     } else {
                         result = "{\"error\":\"No more searches: give your final JSON answer now.\"}";
                     }
@@ -263,8 +270,8 @@ public class SearchService {
         }
         List<Restaurant> kept = filters.apply(List.copyOf(places.values()), criteria, radius, moment);
         DeckSelector.Selection selection = deckSelector.select(List.of(kept), MAX_CANDIDATES);
-        log.info("Agent tool: query of {} chars, prices {}, diets {}, radius {} m, moment {} -> Google {}, kept {}, "
-                + "candidates {} in {} ms", query.length(), googlePrices, diets, Math.round(radius), moment,
+        log.info("Agent tool: query of {} chars, prices {}, {} diets, radius {} m, moment {} -> Google {}, kept {}, "
+                + "candidates {} in {} ms", query.length(), googlePrices, diets.size(), Math.round(radius), moment,
                 raw.size(), kept.size(), selection.deck().size(), millis(start));
         return new ToolRun(criteria, selection.deck(), selection.zone(), rawById);
     }
@@ -343,6 +350,10 @@ public class SearchService {
             throw new SearchException(SearchErrorCode.NO_RESULT, "No restaurant matches the search");
         }
         return new SearchResult(run.criteria(), deck, includeZone ? run.zone() : null);
+    }
+
+    private static List<String> sorted(Set<String> values) {
+        return values.stream().sorted().toList();
     }
 
     private static void putIfPresent(Map<String, Object> map, String key, Object value) {

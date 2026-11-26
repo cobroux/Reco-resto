@@ -26,7 +26,7 @@ public class GooglePlaceMapper {
     private static final String COUNTRY_SUFFIX = ", France";
 
     /** D5: Google price level to the format of feature 003; FREE, UNSPECIFIED and any other value give no price. */
-    static final Map<String, String> PRICE_LEVELS = Map.of(
+    public static final Map<String, String> PRICE_LEVELS = Map.of(
             "PRICE_LEVEL_INEXPENSIVE", "€",
             "PRICE_LEVEL_MODERATE", "€€",
             "PRICE_LEVEL_EXPENSIVE", "€€€",
