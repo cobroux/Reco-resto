@@ -1,1 +1,0 @@
-{"understood":true,"centers":[{"name":"Opéra, Paris","latitude":48.8708,"longitude":2.3322}]}

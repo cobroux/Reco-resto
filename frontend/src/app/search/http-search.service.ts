@@ -15,7 +15,6 @@ export const POSITION_TIMEOUT_MS = 5000;
 const ERROR_CODES: readonly SearchErrorCode[] = [
   'NOT_UNDERSTOOD',
   'NO_RESULT',
-  'OUTSIDE_FRANCE',
   'PLACE_REQUIRED',
   'SERVICE_UNAVAILABLE',
 ];

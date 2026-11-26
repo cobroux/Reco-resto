@@ -69,9 +69,6 @@ llm:
   model: ${LLM_MODEL:nova-lite}
   # Largest answer asked for: the endpoint cuts at 2000 tokens by default, the model accepts up to 10000.
   max-tokens: ${LLM_MAX_TOKENS:10000}
-  # New attempts for an unusable answer: a blank message is asked again, an unreadable answer is sent back to the
-  # model for repair (spec 008 D11).
-  empty-answer-retries: ${LLM_EMPTY_ANSWER_RETRIES:2}
   # Sampling temperature: 0 gives the same reading of the same sentence (product owner, 2026-11-26).
   temperature: ${LLM_TEMPERATURE:0}
 

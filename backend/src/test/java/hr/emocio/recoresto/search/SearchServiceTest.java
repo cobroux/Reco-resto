@@ -1,455 +1,244 @@
 package hr.emocio.recoresto.search;
 
-import static hr.emocio.recoresto.search.restaurant.TestRestaurants.open;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
 import hr.emocio.recoresto.search.api.Position;
 import hr.emocio.recoresto.search.api.SearchErrorCode;
 import hr.emocio.recoresto.search.api.SearchException;
 import hr.emocio.recoresto.search.api.SearchRequest;
-import hr.emocio.recoresto.search.config.LlmProperties;
 import hr.emocio.recoresto.search.config.ChainProperties;
 import hr.emocio.recoresto.search.config.SearchProperties;
+import hr.emocio.recoresto.search.config.TestCardEnrichmentProperties;
 import hr.emocio.recoresto.search.criteria.CriteriaMatcher;
 import hr.emocio.recoresto.search.criteria.MomentResolver;
-import hr.emocio.recoresto.search.criteria.SearchCriteria;
-import hr.emocio.recoresto.search.criteria.SentenceInterpreter;
-import hr.emocio.recoresto.search.google.GooglePlace;
+import hr.emocio.recoresto.search.google.GooglePlaceMapper;
+import hr.emocio.recoresto.search.google.GooglePlacesClient;
 import hr.emocio.recoresto.search.llm.LlmChatClient;
-import hr.emocio.recoresto.search.place.PlaceLocator;
 import hr.emocio.recoresto.search.restaurant.DeckSelector;
-import hr.emocio.recoresto.search.restaurant.NamedPlace;
-import hr.emocio.recoresto.search.restaurant.OpeningPeriod;
 import hr.emocio.recoresto.search.restaurant.Restaurant;
 import hr.emocio.recoresto.search.restaurant.RestaurantFilters;
-import hr.emocio.recoresto.search.restaurant.RestaurantSource;
-import hr.emocio.recoresto.search.restaurant.SearchAnswer;
-import hr.emocio.recoresto.search.restaurant.SearchAnswerParser;
 import hr.emocio.recoresto.search.restaurant.SearchResult;
-import hr.emocio.recoresto.search.restaurant.TestRestaurants;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.slf4j.LoggerFactory;
+import org.mockito.ArgumentCaptor;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Spec 008 T1, T5-T9, T11, T20, T38, T44, T45 with fakes of the interpreter and the source. */
+/** The tool-calling search, with the model and Google replaced by mocks; filters and deck are the real ones. */
 class SearchServiceTest {
 
-    private final SentenceInterpreter interpreter = mock(SentenceInterpreter.class);
-    private final RestaurantSource source = mock(RestaurantSource.class);
-    private final PlaceLocator locator = mock(PlaceLocator.class);
-    private final Clock clock = Clock.fixed(Instant.parse("2026-11-24T10:00:00Z"), ZoneOffset.UTC);
-    private final SearchService service = serviceWith(interpreter);
+    private static final Position HERE = new Position(48.8700, 2.3300);
+    /** Thursday 2026-11-26, 12:00 in Paris. */
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-11-26T11:00:00Z"), ZoneOffset.UTC);
+    private static final int DECK_SIZE = 4;
 
-    private SearchService serviceWith(SentenceInterpreter sentenceInterpreter) {
-        return new SearchService(sentenceInterpreter, locator, new MomentResolver(clock), source,
+    private final JsonMapper mapper = JsonMapper.builder().build();
+    private final LlmChatClient llm = mock(LlmChatClient.class);
+    private final GooglePlacesClient google = mock(GooglePlacesClient.class);
+    private SearchService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new SearchService(llm, google, new GooglePlaceMapper(TestCardEnrichmentProperties.defaults()),
                 new RestaurantFilters(new CriteriaMatcher()), new DeckSelector(new ChainProperties(null, null)),
-                new SearchProperties(2.5, 15, 5));
+                new MomentResolver(CLOCK), new SearchProperties(2.5, DECK_SIZE, 5), mapper, CLOCK);
     }
 
-    private final Position opera = new Position(48.8708, 2.3322);
-    private final Position chatelet = new Position(48.8584, 2.3470);
-    private final Position device = new Position(48.8600, 2.3400);
-    private final SearchRequest request = new SearchRequest("asiatique près d'Opéra", null);
-
-    private SearchCriteria criteria(String moment, Integer distanceLimitMeters) {
-        return new SearchCriteria(null, null, List.of("Opéra"), moment, distanceLimitMeters, null);
+    private SearchResult search(String sentence) {
+        return service.search(new SearchRequest(sentence, HERE), false);
     }
 
-    private SearchCriteria criteriaWalking(Integer walkingMinutes, Integer distanceLimitMeters) {
-        return new SearchCriteria(null, null, List.of("Opéra"), "now", distanceLimitMeters, walkingMinutes);
+    /** Google places "Resto 1".."Resto n", all restaurants with an address, 100 m apart from the position. */
+    private void googleFinds(int count) {
+        List<JsonNode> places = IntStream.rangeClosed(1, count).mapToObj(i -> json("""
+                {"id":"p%d","displayName":{"text":"Resto %d"},"primaryType":"restaurant",
+                 "location":{"latitude":%s,"longitude":2.33},"shortFormattedAddress":"%d rue X"}"""
+                .formatted(i, i, 48.8700 + i * 0.0009, i))).toList();
+        when(google.searchText(anyString(), any(), anyDouble(), anyList())).thenReturn(places);
     }
 
-    private static SearchAnswer understood(SearchCriteria criteria, NamedPlace... places) {
-        return new SearchAnswer(SearchAnswer.State.UNDERSTOOD, criteria, List.of(places));
+    private JsonNode toolCall(String arguments) {
+        return json("{\"role\":\"assistant\",\"tool_calls\":[{\"id\":\"c1\",\"type\":\"function\",\"function\":"
+                + "{\"name\":\"search_restaurants\",\"arguments\":" + mapper.writeValueAsString(arguments) + "}}]}");
     }
 
-    private NamedPlace atOpera() {
-        return new NamedPlace("Opéra", opera);
+    private JsonNode answer(String content) {
+        return json("{\"role\":\"assistant\",\"content\":" + mapper.writeValueAsString(content) + "}");
     }
 
-    private void interpreterAnswers(SearchRequest searched, SearchAnswer answer) {
-        when(interpreter.interpret(searched.sentence())).thenReturn(answer);
+    private JsonNode json(String text) {
+        return mapper.readTree(text);
     }
 
-    private void interpreterAnswers(SearchAnswer answer) {
-        interpreterAnswers(request, answer);
+    private static List<String> names(SearchResult result) {
+        return result.deck().stream().map(Restaurant::name).toList();
     }
 
-    /** The Google place of a restaurant: operational, of type restaurant, identified by its lower-case name. */
-    private static GooglePlace google(Restaurant restaurant) {
-        Restaurant withId = new Restaurant(restaurant.name(), restaurant.location(), restaurant.distanceMeters(),
-                restaurant.cuisine(), restaurant.diets(), restaurant.keywords(), restaurant.priceLevel(),
-                restaurant.openingHours(), restaurant.photoUrl(), restaurant.signatureDish(), restaurant.address(),
-                restaurant.phone(), restaurant.menu(), null,
-                "id-" + restaurant.name().toLowerCase(java.util.Locale.ROOT).replace(' ', '-'), null, null, null);
-        return new GooglePlace(withId.placeId(), List.of("restaurant"), "restaurant", "OPERATIONAL", null, withId);
-    }
-
-    private static List<GooglePlace> google(List<Restaurant> restaurants) {
-        return restaurants.stream().map(SearchServiceTest::google).toList();
-    }
-
-    @SafeVarargs
-    private void sourceFinds(List<Restaurant>... perPoint) {
-        when(source.find(any(), anyList(), anyDouble())).thenReturn(List.of(perPoint).stream()
-                .map(SearchServiceTest::google).toList());
-    }
-
-    private static List<Restaurant> restaurants(String prefix, int count) {
-        return IntStream.rangeClosed(1, count).mapToObj(i -> open(prefix + i)).toList();
-    }
-
-    private static Restaurant at(String name, int distanceMeters) {
-        return TestRestaurants.of(name, "1 rue " + name, TestRestaurants.CENTER, distanceMeters,
-                TestRestaurants.everyDay("00:00", "23:59"));
-    }
-
-    private static void assertCode(Runnable action, SearchErrorCode code) {
-        assertThatThrownBy(action::run).isInstanceOfSatisfying(SearchException.class,
-                e -> assertThat(e.code()).isEqualTo(code));
-    }
-
-    /** T1: the deck is made of the source restaurants, each with its place id. */
     @Test
-    void returnsTheUnderstoodCriteriaAndTheRestaurantsOfTheSource() {
-        SearchCriteria criteria = criteria("now", null);
-        interpreterAnswers(understood(criteria, atOpera()));
-        sourceFinds(restaurants("r", 2));
+    void theModelSearchesThenItsPicksComeFirstWithTheirReasonAndTheDeckIsCompleted() {
+        googleFinds(3);
+        when(llm.chat(anyList(), anyList())).thenReturn(
+                toolCall("{\"query\":\"burger\",\"price_levels\":[\"inexpensive\",\"cheap\"],\"radius_m\":800}"),
+                answer("{\"picks\":[{\"id\":\"r2\",\"reason\":\"Burger maison\"}]}"));
 
-        SearchResult result = service.search(request, false);
+        SearchResult result = search("un burger pas cher à moins de 800 m");
 
-        assertThat(result.criteria()).isEqualTo(criteria);
-        assertThat(result.deck()).extracting(Restaurant::name).containsExactly("r1", "r2");
-        assertThat(result.deck()).extracting(Restaurant::placeId).containsExactly("id-r1", "id-r2");
+        verify(google).searchText("burger", HERE, 800.0, List.of("PRICE_LEVEL_INEXPENSIVE"));
+        assertThat(names(result)).containsExactly("Resto 2", "Resto 1", "Resto 3");
+        assertThat(result.deck()).extracting(Restaurant::reason).containsExactly("Burger maison", null, null);
+        assertThat(result.criteria().query()).isEqualTo("burger");
+        assertThat(result.criteria().distanceLimitMeters()).isEqualTo(800);
+        assertThat(result.criteria().moment()).isEqualTo("now");
         assertThat(result.zone()).isNull();
-        verify(source).find(criteria, List.of(opera), 2500.0);
-    }
-
-    /** T5: default radius 2.5 km. */
-    @Test
-    void usesTheDefaultRadiusWhenTheSentenceHasNoDistance() {
-        interpreterAnswers(understood(criteria("now", null), atOpera()));
-        sourceFinds(List.of(at("two", 2400), at("far", 2600)));
-
-        assertThat(service.search(request, false).deck()).extracting(Restaurant::name).containsExactly("two");
-        verify(source).find(any(), eq(List.of(opera)), eq(2500.0));
     }
 
     @Test
-    void aDistanceInTheSentenceReplacesTheDefaultRadius() {
-        interpreterAnswers(understood(criteria("now", 800), atOpera()));
-        sourceFinds(List.of(at("near", 700), at("farther", 900)));
+    void theDeckStopsAtTheDeckSizeAndTheZoneHoldsEveryCandidateWhenAsked() {
+        googleFinds(6);
+        when(llm.chat(anyList(), anyList())).thenReturn(toolCall("{\"query\":\"pizza\"}"),
+                answer("{\"picks\":[{\"id\":\"r6\",\"reason\":\"a\"},{\"id\":\"r5\",\"reason\":\"b\"}]}"));
 
-        assertThat(service.search(request, false).deck()).extracting(Restaurant::name).containsExactly("near");
-        verify(source).find(any(), anyList(), eq(800.0));
-    }
+        SearchResult result = service.search(new SearchRequest("pizza", HERE), true);
 
-    /** T6: 10 minutes on foot at 5 km/h = 833 m. */
-    @Test
-    void aTravelTimeInTheSentenceIsAWalkingDistanceAt5KmPerHour() {
-        interpreterAnswers(understood(criteriaWalking(10, null), atOpera()));
-        sourceFinds(List.of(at("near", 800), at("farther", 900)));
-
-        assertThat(service.search(request, false).deck()).extracting(Restaurant::name).containsExactly("near");
-        verify(source).find(any(), anyList(), eq(833.0));
+        assertThat(names(result)).containsExactly("Resto 6", "Resto 5", "Resto 1", "Resto 2");
+        assertThat(result.zone()).hasSize(6);
     }
 
     @Test
-    void aDistanceInMetersWinsOverATravelTime() {
-        interpreterAnswers(understood(criteriaWalking(30, 500), atOpera()));
-        sourceFinds(List.of(at("near", 800)));
+    void unknownRepeatedOrMalformedIdsAreIgnoredAndALongReasonIsCut() {
+        googleFinds(2);
+        String longReason = "x".repeat(200);
+        when(llm.chat(anyList(), anyList())).thenReturn(toolCall("{\"query\":\"pizza\"}"),
+                answer("Voici : {\"picks\":[{\"id\":\"r9\"},{\"id\":\"p1\"},{\"id\":\"r2\",\"reason\":\"" + longReason
+                        + "\"},{\"id\":\"r2\",\"reason\":\"again\"}]}"));
 
-        assertCode(() -> service.search(request, false), SearchErrorCode.NO_RESULT);
-        verify(source).find(any(), anyList(), eq(500.0));
+        SearchResult result = search("pizza");
+
+        assertThat(names(result)).containsExactly("Resto 2", "Resto 1");
+        assertThat(result.deck().getFirst().reason()).hasSize(120);
     }
 
     @Test
-    void onlyRestaurantsOpenAtTheTargetedMomentAreReturned() {
-        // 2026-11-28 is a Saturday; the second restaurant is closed on Saturday.
-        Restaurant openSaturday = TestRestaurants.of("sat", "1 rue sat", TestRestaurants.CENTER, 100,
-                TestRestaurants.everyDay("11:00", "15:00"));
-        Restaurant closedSaturday = TestRestaurants.of("mon", "1 rue mon", TestRestaurants.CENTER, 100,
-                Map.of("MONDAY", List.of(new OpeningPeriod("11:00", "15:00"))));
-        interpreterAnswers(understood(criteria("2026-11-28T12:00", null), atOpera()));
-        sourceFinds(List.of(openSaturday, closedSaturday));
+    void theToolArgumentsAreCheckedBeforeGoogleIsCalled() {
+        googleFinds(1);
+        when(llm.chat(anyList(), anyList())).thenReturn(
+                toolCall("{\"radius_m\":50,\"diets\":[\"kosher\"],\"open_at\":\"2020-01-01T12:00\"}"),
+                answer("{\"picks\":[]}"));
 
-        assertThat(service.search(request, false).deck()).extracting(Restaurant::name).containsExactly("sat");
+        SearchResult result = search("n'importe quoi");
+
+        // no query: any restaurant; radius below 300 m: 300 m; unknown diet dropped; past moment: now
+        verify(google).searchText("restaurant", HERE, 300.0, List.of());
+        assertThat(result.criteria().diets()).isEmpty();
+        assertThat(result.criteria().moment()).isEqualTo("now");
     }
 
     @Test
-    void aMomentInThePastIsNotUnderstoodAndGoogleIsNotCalled() {
-        interpreterAnswers(understood(criteria("2026-11-23T20:00", null), atOpera()));
+    void aLargeRadiusIsCappedAndATravelTimeIsWalked() {
+        googleFinds(1);
+        when(llm.chat(anyList(), anyList())).thenReturn(toolCall("{\"query\":\"a\",\"radius_m\":99999}"),
+                answer("{\"picks\":[]}"), toolCall("{\"query\":\"b\",\"walking_minutes\":10}"),
+                answer("{\"picks\":[]}"));
 
-        assertCode(() -> service.search(request, false), SearchErrorCode.NOT_UNDERSTOOD);
-        verifyNoInteractions(source);
-    }
+        search("a");
+        search("b");
 
-    /** T11, T45: the deck holds the deck size; the zone holds what the source returned, no more. */
-    @Test
-    void deckHasAtMostTheDeckSizeWhileTheZoneKeepsWhatTheSourceReturned() {
-        interpreterAnswers(understood(criteria("now", null), atOpera()));
-        sourceFinds(restaurants("r", 20));
-
-        SearchResult result = service.search(request, true);
-
-        assertThat(result.deck()).hasSize(15);
-        assertThat(result.zone()).hasSize(20);
-    }
-
-    /** T7: a place found around both places appears once. */
-    @Test
-    void severalPlacesAreSearchedAndMergedWithoutDuplicates() {
-        interpreterAnswers(understood(criteria("now", null), atOpera(), new NamedPlace("Châtelet", chatelet)));
-        sourceFinds(List.of(open("A"), open("B")), List.of(open("B"), open("C")));
-
-        assertThat(service.search(request, false).deck()).extracting(Restaurant::name).containsExactly("A", "B", "C");
-        verify(source).find(any(), eq(List.of(opera, chatelet)), anyDouble());
+        verify(google).searchText("a", HERE, 5000.0, List.of());
+        verify(google).searchText("b", HERE, 833.0, List.of());
     }
 
     @Test
-    void restaurantsOutsideTheRadiusOrWithoutAddressAreNotReturned() {
-        Restaurant noAddress = TestRestaurants.of("none", null, TestRestaurants.CENTER, 100,
-                TestRestaurants.everyDay("00:00", "23:59"));
-        interpreterAnswers(understood(criteria("now", null), atOpera()));
-        sourceFinds(List.of(at("far", 3000), noAddress, open("ok")));
+    void theModelReadsCompactCandidatesWithShortIds() {
+        googleFinds(2);
+        when(llm.chat(anyList(), anyList())).thenReturn(toolCall("{\"query\":\"pizza\"}"), answer("{\"picks\":[]}"));
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Object>> messages = ArgumentCaptor.forClass(List.class);
 
-        assertThat(service.search(request, false).deck()).extracting(Restaurant::name).containsExactly("ok");
-    }
+        search("pizza");
 
-    /** T20. */
-    @Test
-    void aSentenceThatIsNotARequestIsNotUnderstood() {
-        interpreterAnswers(new SearchAnswer(SearchAnswer.State.NOT_A_REQUEST, null, List.of()));
-
-        assertCode(() -> service.search(request, false), SearchErrorCode.NOT_UNDERSTOOD);
-        verifyNoInteractions(source);
-    }
-
-    /** T8: outside France, no Google request. */
-    @Test
-    void aPlaceOutsideFranceIsReportedAndTheSourceIsNeverCalled() {
-        interpreterAnswers(new SearchAnswer(SearchAnswer.State.OUTSIDE_FRANCE, null, List.of()));
-
-        assertThatThrownBy(() -> service.search(request, false)).isInstanceOfSatisfying(SearchException.class,
-                e -> {
-                    assertThat(e.code()).isEqualTo(SearchErrorCode.OUTSIDE_FRANCE);
-                    assertThat(e.getMessage()).isEqualTo("Nappe n'est disponible qu'en France pour l'instant");
-                });
-        verifyNoInteractions(source);
-    }
-
-    /** T9, D14: no place in the sentence, the device position is the only search point. */
-    @Test
-    void withoutPlaceTheDevicePositionIsTheOnlySearchPoint() {
-        SearchRequest withPosition = new SearchRequest("un bon thaï ce soir", device);
-        interpreterAnswers(withPosition, understood(criteria("now", null)));
-        sourceFinds(restaurants("r", 1));
-
-        assertThat(service.search(withPosition, false).deck()).hasSize(1);
-        verify(source).find(any(), eq(List.of(device)), anyDouble());
-    }
-
-    /** D14: the device position is used only when the sentence names no place. */
-    @Test
-    void aNamedPlaceWinsOverTheDevicePosition() {
-        SearchRequest withPosition = new SearchRequest("thaï à Opéra", device);
-        interpreterAnswers(withPosition, understood(criteria("now", null), atOpera()));
-        sourceFinds(restaurants("r", 1));
-
-        service.search(withPosition, false);
-
-        verify(source).find(any(), eq(List.of(opera)), anyDouble());
+        verify(llm, times(2)).chat(messages.capture(), anyList());
+        Object toolResult = messages.getValue().stream().filter(m -> m instanceof Map<?, ?> map
+                && "tool".equals(map.get("role"))).map(m -> ((Map<?, ?>) m).get("content")).findFirst().orElseThrow();
+        JsonNode candidates = json((String) toolResult);
+        assertThat(candidates.path("count").asInt()).isEqualTo(2);
+        assertThat(candidates.path("candidates").path(0).path("id").asString()).isEqualTo("r1");
+        assertThat(candidates.path("candidates").path(0).path("name").asString()).isEqualTo("Resto 1");
+        assertThat(candidates.path("candidates").path(0).has("address")).isFalse();
     }
 
     @Test
-    void noPlaceAndNoPositionGivesPlaceRequired() {
-        interpreterAnswers(understood(criteria("now", null)));
-
-        assertCode(() -> service.search(request, false), SearchErrorCode.PLACE_REQUIRED);
-        verifyNoInteractions(source);
-    }
-
-    /** T16, T17, D13: places without a position are located before the search. */
-    @Test
-    void placesWithoutPositionAreLocatedBeforeTheSearch() {
-        interpreterAnswers(understood(criteria("now", null), atOpera(), new NamedPlace("Châtelet", null)));
-        when(locator.locate("Châtelet")).thenReturn(chatelet);
-        sourceFinds(restaurants("r", 1), List.of());
-
-        service.search(request, false);
-
-        verify(source).find(any(), eq(List.of(opera, chatelet)), anyDouble());
-    }
-
-    /** D13 (1): a valid position of the model is kept and not located. */
-    @Test
-    void aValidModelPositionIsNotLocated() {
-        interpreterAnswers(understood(criteria("now", null), atOpera()));
-        sourceFinds(restaurants("r", 1));
-
-        service.search(request, false);
-
-        verifyNoInteractions(locator);
-    }
-
-    /** D13 (3): a place that cannot be located, no Google search. */
-    @Test
-    void aPlaceThatCannotBeLocatedGivesPlaceRequired() {
-        interpreterAnswers(understood(criteria("now", null), new NamedPlace("Nulle part", null)));
-        when(locator.locate("Nulle part")).thenThrow(new SearchException(SearchErrorCode.PLACE_REQUIRED,
-                "A place is required"));
-
-        assertCode(() -> service.search(new SearchRequest(request.sentence(), device), false),
-                SearchErrorCode.PLACE_REQUIRED);
-        verifyNoInteractions(source);
-    }
-
-    /** T8, D13: a place located outside France. */
-    @Test
-    void aPlaceLocatedOutsideFranceIsOutsideFrance() {
-        interpreterAnswers(understood(criteria("now", null), new NamedPlace("Colisée", null)));
-        when(locator.locate("Colisée")).thenThrow(new SearchException(SearchErrorCode.OUTSIDE_FRANCE,
-                "Nappe n'est disponible qu'en France pour l'instant"));
-
-        assertCode(() -> service.search(request, false), SearchErrorCode.OUTSIDE_FRANCE);
-        verifyNoInteractions(source);
-    }
-
-    /** SC-003 (T042 fixture set): every recorded answer of an understood sentence ends in a deck. */
-    @ParameterizedTest
-    @ValueSource(strings = {"prose-around.txt", "json-fence.txt", "two-objects.txt", "only-understood-and-place.txt",
-            "no-centers.txt", "out-of-range-center.txt", "missing-closing-brace.txt", "empty.txt"})
-    void everyRecordedAnswerOfAnUnderstoodSentenceEndsInADeck(String file) throws Exception {
-        String recorded;
-        try (var stream = getClass().getResourceAsStream("/llm-answers/" + file)) {
-            recorded = new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-        }
-        String repaired = "{\"understood\":true,\"criteria\":{\"places\":[\"Opéra, Paris\"]},"
-                + "\"centers\":[{\"name\":\"Opéra, Paris\",\"latitude\":48.8708,\"longitude\":2.3322}]}";
-        LlmChatClient llm = mock(LlmChatClient.class);
-        when(llm.complete(any(), any())).thenReturn(recorded, repaired);
-        JsonMapper json = JsonMapper.builder().build();
-        SentenceInterpreter recordedInterpreter = new SentenceInterpreter(llm, new SearchAnswerParser(json),
-                new LlmProperties("https://llm.test/v1", "k", "m", null, 2, null), clock);
-        when(locator.locate(any())).thenReturn(opera);
-        sourceFinds(restaurants("r", 3));
-
-        SearchResult result = serviceWith(recordedInterpreter).search(new SearchRequest("Je veux manger à opera",
-                null), false);
-
-        assertThat(result.deck()).hasSize(3);
-    }
-
-    /** T38. */
-    @Test
-    void aSourceWithNoRestaurantAtAllGivesNoResult() {
-        interpreterAnswers(understood(criteria("now", null), atOpera()));
-        sourceFinds(List.of());
-
-        assertCode(() -> service.search(request, false), SearchErrorCode.NO_RESULT);
+    void withoutPositionTheSearchIsRefusedBeforeAnyRequest() {
+        assertThatThrownBy(() -> service.search(new SearchRequest("pizza", null), false))
+                .isInstanceOfSatisfying(SearchException.class,
+                        e -> assertThat(e.code()).isEqualTo(SearchErrorCode.PLACE_REQUIRED));
+        verify(llm, never()).chat(anyList(), anyList());
     }
 
     @Test
-    void noMatchingRestaurantGivesNoResult() {
-        interpreterAnswers(understood(criteria("now", null), atOpera()));
-        sourceFinds(List.of(at("far", 9000)));
-
-        assertCode(() -> service.search(request, false), SearchErrorCode.NO_RESULT);
-    }
-
-    @Test
-    void aServiceFailureOfTheSourceIsNotHidden() {
-        interpreterAnswers(understood(criteria("now", null), atOpera()));
-        when(source.find(any(), anyList(), anyDouble()))
+    void whenTheModelFailsTheRawSentenceIsSearchedInBackendOrder() {
+        googleFinds(2);
+        when(llm.chat(anyList(), anyList()))
                 .thenThrow(new SearchException(SearchErrorCode.SERVICE_UNAVAILABLE, "down"));
 
-        assertCode(() -> service.search(request, false), SearchErrorCode.SERVICE_UNAVAILABLE);
-    }
+        SearchResult result = search("ramen");
 
-    private List<String> logsOf(Runnable action, Level level) {
-        Logger logger = (Logger) LoggerFactory.getLogger(SearchService.class);
-        Level before = logger.getLevel();
-        ListAppender<ILoggingEvent> appender = new ListAppender<>();
-        appender.start();
-        logger.addAppender(appender);
-        logger.setLevel(level);
-        try {
-            action.run();
-        } finally {
-            logger.detachAppender(appender);
-            logger.setLevel(before);
-        }
-        return appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+        verify(google).searchText("ramen", HERE, 2500.0, List.of());
+        assertThat(names(result)).containsExactly("Resto 1", "Resto 2");
     }
 
     @Test
-    void everyStepOfASearchIsLoggedWithCountsDurationsAndPlaceIds() {
-        interpreterAnswers(understood(criteria("now", null), atOpera()));
-        sourceFinds(List.of(open("ok"), at("far", 9000), open("ok2")));
+    void whenTheModelAnswersWithoutSearchingTheRawSentenceIsSearched() {
+        googleFinds(1);
+        when(llm.chat(anyList(), anyList())).thenReturn(answer("Où êtes-vous ?"));
 
-        List<String> messages = logsOf(() -> service.search(request, false), Level.INFO);
-
-        assertThat(messages).anySatisfy(m -> assertThat(m).contains("Search received"));
-        assertThat(messages).anySatisfy(m -> assertThat(m).contains("UNDERSTOOD").contains("places=1"));
-        assertThat(messages).anySatisfy(m -> assertThat(m).contains("radius").contains("2500"));
-        assertThat(messages).anySatisfy(m -> assertThat(m).contains("Source returned 3 places").contains(" ms"));
-        assertThat(messages).anySatisfy(m -> assertThat(m).contains("Filters kept 2 of 3"));
-        assertThat(messages).anySatisfy(m -> assertThat(m).contains("id-ok").contains("id-ok2"));
-    }
-
-    /** T44, FR-016: Google business names and addresses are never logged. */
-    @Test
-    void restaurantNamesAndAddressesAreNeverLogged() {
-        interpreterAnswers(understood(criteria("now", null), atOpera()));
-        sourceFinds(List.of(open("Chez Secret")));
-
-        assertThat(logsOf(() -> service.search(request, false), Level.TRACE))
-                .noneSatisfy(m -> assertThat(m).containsAnyOf("Chez Secret", "1 rue Chez Secret"));
+        assertThat(names(search("ramen"))).containsExactly("Resto 1");
+        verify(google).searchText("ramen", HERE, 2500.0, List.of());
     }
 
     @Test
-    void theSentenceIsLoggedOnlyAtDebugLevel() {
-        interpreterAnswers(understood(criteria("now", null), atOpera()));
-        sourceFinds(restaurants("r", 1));
+    void anUnreadableFinalAnswerKeepsTheBackendOrder() {
+        googleFinds(2);
+        when(llm.chat(anyList(), anyList())).thenReturn(toolCall("{\"query\":\"pizza\"}"), answer("pas du JSON"));
 
-        assertThat(logsOf(() -> service.search(request, false), Level.INFO))
-                .noneSatisfy(m -> assertThat(m).contains("asiatique près d'Opéra"));
-        assertThat(logsOf(() -> service.search(request, false), Level.DEBUG))
-                .anySatisfy(m -> assertThat(m).contains("asiatique près d'Opéra"));
+        assertThat(names(search("pizza"))).containsExactly("Resto 1", "Resto 2");
     }
 
-    /** Text Search experiment: the query is logged by its length at INFO, its text only at DEBUG. */
     @Test
-    void theQueryIsLoggedByItsLengthAtInfoAndItsTextOnlyAtDebug() {
-        SearchCriteria aligot = new SearchCriteria("aligot aux truffes", null, List.of("Opéra"), "now", null, null);
-        interpreterAnswers(understood(aligot, atOpera()));
-        sourceFinds(restaurants("r", 1));
+    void aThirdSearchIsRefusedAndTheLastCandidatesAreUsed() {
+        googleFinds(1);
+        when(llm.chat(anyList(), anyList())).thenReturn(toolCall("{\"query\":\"a\"}"), toolCall("{\"query\":\"b\"}"),
+                toolCall("{\"query\":\"c\"}"));
 
-        List<String> info = logsOf(() -> service.search(request, false), Level.INFO);
-        assertThat(info).anySatisfy(m -> assertThat(m).contains("query of 18 characters"));
-        assertThat(info).noneSatisfy(m -> assertThat(m).contains("aligot"));
-        assertThat(logsOf(() -> service.search(request, false), Level.DEBUG))
-                .anySatisfy(m -> assertThat(m).contains("aligot aux truffes"));
+        assertThat(names(search("a"))).containsExactly("Resto 1");
+        verify(llm, times(3)).chat(anyList(), anyList());
+        verify(google, times(2)).searchText(anyString(), any(), anyDouble(), anyList());
+        verify(google, never()).searchText(eq("c"), any(), anyDouble(), anyList());
+    }
+
+    @Test
+    void noCandidateIsNoResult() {
+        when(google.searchText(anyString(), any(), anyDouble(), anyList())).thenReturn(new ArrayList<>());
+        when(llm.chat(anyList(), anyList())).thenReturn(toolCall("{\"query\":\"pizza\"}"), answer("{\"picks\":[]}"));
+
+        assertThatThrownBy(() -> search("pizza")).isInstanceOfSatisfying(SearchException.class,
+                e -> assertThat(e.code()).isEqualTo(SearchErrorCode.NO_RESULT));
     }
 }

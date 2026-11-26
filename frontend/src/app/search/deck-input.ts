@@ -78,6 +78,7 @@ function toDeckRestaurant(restaurant: Restaurant & { address: string; distanceMe
     attributions: restaurant.attributions,
     menu: restaurant.menu,
     phone: restaurant.phone,
+    reason: restaurant.reason,
   };
 }
 

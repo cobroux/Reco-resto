@@ -21,7 +21,7 @@ class RestaurantFiltersTest {
     /** A Saturday. */
     private static final ZonedDateTime SATURDAY_NOON = ZonedDateTime.of(2026, 11, 28, 12, 0, 0, 0, PARIS);
 
-    private static final SearchCriteria NO_CRITERIA = new SearchCriteria(null, null, null, null, null, null);
+    private static final SearchCriteria NO_CRITERIA = new SearchCriteria(null, null, null, null);
 
     private final RestaurantFilters filters = new RestaurantFilters(new CriteriaMatcher());
 
@@ -160,7 +160,7 @@ class RestaurantFiltersTest {
     /** 008 D8: a diet the user requires is still filtered on what Google states. */
     @Test
     void placesNotStatingARequiredDietAreExcluded() {
-        SearchCriteria vegan = new SearchCriteria("pizza", List.of("vegan"), null, null, null, null);
+        SearchCriteria vegan = new SearchCriteria("pizza", List.of("vegan"), null, null);
         List<GooglePlace> places = List.of(place(at("vegan", 100), "OPERATIONAL", "pizza_restaurant",
                 "vegan_restaurant", "restaurant"), place(at("other", 100), "OPERATIONAL", "pizza_restaurant",
                 "restaurant"));

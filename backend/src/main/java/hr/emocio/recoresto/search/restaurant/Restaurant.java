@@ -18,11 +18,27 @@ public record Restaurant(String name, Position location, Integer distanceMeters,
         List<String> diets, List<String> keywords, String priceLevel,
         Map<String, List<OpeningPeriod>> openingHours, String photoUrl, String signatureDish, String address,
         String phone, List<MenuItem> menu, String website, String placeId, List<Attribution> photoAttributions,
-        String photoSourceUri, List<DataProvider> attributions) {
+        String photoSourceUri, List<DataProvider> attributions, String reason) {
+
+    /** Without {@code reason} (prototype agent search: why the model picked the restaurant). */
+    public Restaurant(String name, Position location, Integer distanceMeters, String cuisine, List<String> diets,
+            List<String> keywords, String priceLevel, Map<String, List<OpeningPeriod>> openingHours, String photoUrl,
+            String signatureDish, String address, String phone, List<MenuItem> menu, String website, String placeId,
+            List<Attribution> photoAttributions, String photoSourceUri, List<DataProvider> attributions) {
+        this(name, location, distanceMeters, cuisine, diets, keywords, priceLevel, openingHours, photoUrl,
+                signatureDish, address, phone, menu, website, placeId, photoAttributions, photoSourceUri, attributions,
+                null);
+    }
 
     public Restaurant withLocation(Position newLocation, Integer newDistanceMeters) {
         return new Restaurant(name, newLocation, newDistanceMeters, cuisine, diets, keywords, priceLevel,
                 openingHours, photoUrl, signatureDish, address, phone, menu, website, placeId, photoAttributions,
-                photoSourceUri, attributions);
+                photoSourceUri, attributions, reason);
+    }
+
+    public Restaurant withReason(String newReason) {
+        return new Restaurant(name, location, distanceMeters, cuisine, diets, keywords, priceLevel, openingHours,
+                photoUrl, signatureDish, address, phone, menu, website, placeId, photoAttributions, photoSourceUri,
+                attributions, newReason);
     }
 }

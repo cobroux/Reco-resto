@@ -239,6 +239,14 @@
   color: var(--color-muted);
 }
 
+/* Why the model picked this restaurant. */
+.reason {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.35;
+  font-style: italic;
+}
+
 .chips {
   margin: 0;
   padding: 0;

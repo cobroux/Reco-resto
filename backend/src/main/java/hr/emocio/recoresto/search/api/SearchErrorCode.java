@@ -5,7 +5,6 @@ import org.springframework.http.HttpStatus;
 public enum SearchErrorCode {
     NOT_UNDERSTOOD(HttpStatus.UNPROCESSABLE_CONTENT),
     NO_RESULT(HttpStatus.UNPROCESSABLE_CONTENT),
-    OUTSIDE_FRANCE(HttpStatus.UNPROCESSABLE_CONTENT),
     PLACE_REQUIRED(HttpStatus.UNPROCESSABLE_CONTENT),
     SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE);
 

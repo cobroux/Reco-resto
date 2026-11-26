@@ -52,16 +52,15 @@ export interface Restaurant {
   /** Spec 008: data providers to show with "Google Maps". */
   readonly attributions?: readonly DataProvider[];
   readonly menu?: readonly MenuItem[];
+  /** Why the model picked this restaurant (tool-calling search). */
+  readonly reason?: string;
 }
 
 export interface SearchCriteria {
-  readonly cuisines: readonly string[];
+  readonly query?: string;
   readonly diets: readonly string[];
-  readonly places: readonly string[];
   readonly moment?: string;
-  readonly distanceLimitMeters?: number | null;
-  /** A travel time of the sentence, always on foot (the backend turns it into a distance). */
-  readonly walkingMinutes?: number | null;
+  readonly distanceLimitMeters?: number;
 }
 
 export interface SearchResult {
@@ -73,7 +72,6 @@ export interface SearchResult {
 export type SearchErrorCode =
   | 'NOT_UNDERSTOOD'
   | 'NO_RESULT'
-  | 'OUTSIDE_FRANCE'
   | 'PLACE_REQUIRED'
   | 'SERVICE_UNAVAILABLE';
 

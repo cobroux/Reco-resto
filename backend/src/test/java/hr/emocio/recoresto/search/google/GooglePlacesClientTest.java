@@ -87,13 +87,26 @@ class GooglePlacesClientTest {
                 .andExpect(jsonPath("$.pageToken").doesNotExist())
                 .andExpect(jsonPath("$.languageCode").value("fr"))
                 .andExpect(jsonPath("$.regionCode").value("FR"))
+                .andExpect(jsonPath("$.priceLevels").doesNotExist())
                 .andRespond(withSuccess("{\"places\":[{\"id\":\"a\"},{\"id\":\"b\"}],\"nextPageToken\":\"t\"}",
                         MediaType.APPLICATION_JSON));
 
-        List<JsonNode> places = client.searchText("frites", OPERA, 2500);
+        List<JsonNode> places = client.searchText("frites", OPERA, 2500, List.of());
 
         assertThat(places).extracting(place -> place.path("id").asString()).containsExactly("a", "b");
         server.verify(); // one request only: the next page is never asked for
+    }
+
+    @Test
+    void thePriceLevelsRestrictTheSearchWhenGiven() {
+        GooglePlacesClient client = client(null);
+        server.expect(requestTo(SEARCH))
+                .andExpect(jsonPath("$.priceLevels[0]").value("PRICE_LEVEL_INEXPENSIVE"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        client.searchText("pizza", OPERA, 2500, List.of("PRICE_LEVEL_INEXPENSIVE"));
+
+        server.verify();
     }
 
     /** FR-008, D21 (2) and (3): the single list of the Google fields used. */
@@ -102,7 +115,8 @@ class GooglePlacesClientTest {
         assertThat(GooglePlacesClient.SEARCH_FIELD_MASK).isEqualTo("places.id,places.displayName,places.location,"
                 + "places.shortFormattedAddress,places.types,places.primaryType,places.primaryTypeDisplayName,"
                 + "places.businessStatus,places.photos,places.attributions,places.regularOpeningHours,"
-                + "places.priceLevel,places.websiteUri,places.nationalPhoneNumber,places.servesVegetarianFood");
+                + "places.priceLevel,places.websiteUri,places.nationalPhoneNumber,places.servesVegetarianFood,"
+                + "places.rating,places.userRatingCount,places.editorialSummary");
     }
 
     /** T38: Google found no place. */
@@ -112,7 +126,7 @@ class GooglePlacesClientTest {
         server.expect(requestTo(BASE + "/places:searchText"))
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
-        assertThat(client.searchText("restaurant", OPERA, 2500)).isEmpty();
+        assertThat(client.searchText("restaurant", OPERA, 2500, List.of())).isEmpty();
     }
 
     @Test
@@ -120,7 +134,7 @@ class GooglePlacesClientTest {
         GooglePlacesClient client = client(null);
         server.expect(requestTo(BASE + "/places:searchText")).andRespond(withStatus(HttpStatus.FORBIDDEN));
 
-        assertUnavailable(() -> client.searchText("restaurant", OPERA, 2500));
+        assertUnavailable(() -> client.searchText("restaurant", OPERA, 2500, List.of()));
     }
 
     @Test
@@ -129,7 +143,7 @@ class GooglePlacesClientTest {
         server.expect(requestTo(BASE + "/places:searchText"))
                 .andRespond(withSuccess("{not json", MediaType.APPLICATION_JSON));
 
-        assertUnavailable(() -> client.searchText("restaurant", OPERA, 2500));
+        assertUnavailable(() -> client.searchText("restaurant", OPERA, 2500, List.of()));
     }
 
     @Test
@@ -137,7 +151,7 @@ class GooglePlacesClientTest {
         Path fixture = Files.writeString(dir.resolve("fixture.json"), "{\"places\":[{\"id\":\"fixture-1\"}]}");
         GooglePlacesClient client = client(fixture.toString());
 
-        assertThat(client.searchText("restaurant", OPERA, 2500))
+        assertThat(client.searchText("restaurant", OPERA, 2500, List.of()))
                 .extracting(place -> place.path("id").asString()).containsExactly("fixture-1");
         server.verify(); // no request was expected, none was made
     }
@@ -146,14 +160,14 @@ class GooglePlacesClientTest {
     void theDevelopmentFixtureOfTheRepositoryIsReadable() {
         GooglePlacesClient client = client("dev/google-places-fixture.json");
 
-        assertThat(client.searchText("restaurant", OPERA, 2500)).isNotEmpty();
+        assertThat(client.searchText("restaurant", OPERA, 2500, List.of())).isNotEmpty();
     }
 
     @Test
     void anUnreadableFixtureIsServiceUnavailable(@TempDir Path dir) {
         GooglePlacesClient client = client(dir.resolve("missing.json").toString());
 
-        assertUnavailable(() -> client.searchText("restaurant", OPERA, 2500));
+        assertUnavailable(() -> client.searchText("restaurant", OPERA, 2500, List.of()));
     }
 
     private static void assertUnavailable(Runnable action) {
@@ -208,35 +222,6 @@ class GooglePlacesClientTest {
         assertUnavailable(() -> client.photo("p1", "x"));
     }
 
-    // --- Place location (T044, D13): Text Search ---
-
-    @Test
-    void locateSendsATextSearchForTheFirstPlaceWithTheLocationMask() {
-        GooglePlacesClient client = client(null);
-        server.expect(requestTo(BASE + "/places:searchText"))
-                .andExpect(method(HttpMethod.POST))
-                .andExpect(header("X-Goog-Api-Key", KEY))
-                .andExpect(header("X-Goog-FieldMask", "places.location,places.addressComponents"))
-                .andExpect(jsonPath("$.textQuery").value("Opéra, Paris"))
-                .andExpect(jsonPath("$.pageSize").value(1))
-                .andExpect(jsonPath("$.languageCode").value("fr"))
-                .andExpect(jsonPath("$.regionCode").value("FR"))
-                .andRespond(withSuccess("{\"places\":[{\"location\":{\"latitude\":48.87,\"longitude\":2.33}}]}",
-                        MediaType.APPLICATION_JSON));
-
-        assertThat(client.locate("Opéra, Paris")).hasValueSatisfying(place -> assertThat(
-                place.path("location").path("latitude").asDouble()).isEqualTo(48.87));
-        server.verify();
-    }
-
-    @Test
-    void locateWithoutPlaceIsEmpty() {
-        GooglePlacesClient client = client(null);
-        server.expect(requestTo(BASE + "/places:searchText")).andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
-
-        assertThat(client.locate("Nulle part")).isEmpty();
-    }
-
     // --- Failures (T051: T33-T37, T39; D2; contracts/google-places-requests.md "Error mapping") ---
 
     private static final String SEARCH = BASE + "/places:searchText";
@@ -258,7 +243,7 @@ class GooglePlacesClientTest {
     /** Runs a search that must fail with SERVICE_UNAVAILABLE and returns the warnings it logged. */
     private List<String> failingSearch(GooglePlacesClient client) {
         List<String> messages = warnings(() -> assertUnavailable(() -> client.searchText("restaurant",
-                OPERA, 2500)));
+                OPERA, 2500, List.of())));
         assertThat(messages).isNotEmpty().allSatisfy(m -> assertThat(m).doesNotContain(KEY)
                 .doesNotContain("X-Goog").contains("search"));
         return messages;
@@ -282,7 +267,7 @@ class GooglePlacesClientTest {
         server.expect(requestTo(SEARCH)).andRespond(withSuccess("{\"places\":[{\"id\":\"a\"}]}",
                 MediaType.APPLICATION_JSON));
 
-        assertThat(client.searchText("restaurant", OPERA, 2500)).hasSize(1);
+        assertThat(client.searchText("restaurant", OPERA, 2500, List.of())).hasSize(1);
         server.verify();
     }
 
@@ -329,7 +314,6 @@ class GooglePlacesClientTest {
         GooglePlacesClient client = client(" ", null);
 
         assertThat(failingSearch(client)).anySatisfy(m -> assertThat(m).contains("key-missing"));
-        assertUnavailable(() -> client.locate("Opéra"));
         assertUnavailable(() -> client.photo("p1", "ph1"));
         server.verify(); // no request was expected, none was made
     }
@@ -372,29 +356,26 @@ class GooglePlacesClientTest {
 
     /** D2 applies to every operation. */
     @Test
-    void locateAndPhotoAreRetriedToo() {
+    void photoIsRetriedToo() {
         GooglePlacesClient client = client(null);
-        server.expect(requestTo(BASE + "/places:searchText")).andRespond(withServerError());
-        server.expect(requestTo(BASE + "/places:searchText")).andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
         server.expect(requestTo(BASE + "/places/p1/photos/ph1/media?maxWidthPx=800"))
                 .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
         server.expect(requestTo(BASE + "/places/p1/photos/ph1/media?maxWidthPx=800"))
                 .andRespond(withSuccess(new byte[] {7}, MediaType.IMAGE_PNG));
 
-        assertThat(client.locate("Opéra")).isEmpty();
         assertThat(client.photo("p1", "ph1")).isPresent();
-        assertThat(waits).containsExactly(1000L, 1000L);
+        assertThat(waits).containsExactly(1000L);
         server.verify();
     }
 
     @Test
     void theWarningsNameTheOperation() {
         GooglePlacesClient client = client(null);
-        server.expect(ExpectedCount.once(), requestTo(BASE + "/places:searchText"))
+        server.expect(ExpectedCount.once(), requestTo(BASE + "/places/p1/photos/ph1/media?maxWidthPx=800"))
                 .andRespond(withStatus(HttpStatus.FORBIDDEN));
 
-        assertThat(warnings(() -> assertUnavailable(() -> client.locate("Opéra"))))
-                .anySatisfy(m -> assertThat(m).contains("locate").contains("permission-denied"));
+        assertThat(warnings(() -> assertUnavailable(() -> client.photo("p1", "ph1"))))
+                .anySatisfy(m -> assertThat(m).contains("photo").contains("permission-denied"));
     }
 
     // --- Startup (T052: T36) ---
