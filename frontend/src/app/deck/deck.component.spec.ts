@@ -1,12 +1,17 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { Subject } from 'rxjs';
+import { Subject, of } from 'rxjs';
 import { vi } from 'vitest';
 import { Restaurant } from '../restaurant/restaurant';
 import { SearchResultStore } from '../search/search-result.store';
 import { SessionReactionsService } from '../session/session-reactions.service';
+import { CARD_ENRICHMENT_URL } from '../enrichment/card-enrichment.store';
 import { COOKING_TOSS_MS } from './cooking-toss.token';
+import { DECK_SIZE } from './deck-size.token';
 import { DeckComponent } from './deck.component';
+import { DeckStore } from './deck.store';
 import { DECK_TEXTS } from './deck.texts';
 import { DeckInput } from './deck.types';
 import { RefinementService } from './refinement.service';
@@ -37,6 +42,8 @@ describe('DeckComponent', () => {
       imports: [DeckComponent],
       providers: [
         provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: RefinementService, useValue: refinement },
         { provide: SWIPE_ANIMATION_MS, useValue: animationMs },
         { provide: COOKING_TOSS_MS, useValue: 0 },
@@ -320,6 +327,160 @@ describe('DeckComponent', () => {
       pending.next([]);
       await fixture.whenStable();
       expect(hapticSwitch(DECK_TEXTS.like).disabled).toBe(false);
+    });
+  });
+  describe('spec 007 — card website enrichment (T4, T5, T15, T17-T20, T22, T23, T29)', () => {
+    /** Browser image preloaded by the enrichment store: loads, unless its address contains "broken". */
+    class FakeImage {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      referrerPolicy = '';
+      set src(url: string) {
+        queueMicrotask(() => (url.includes('broken') ? this.onerror?.() : this.onload?.()));
+      }
+    }
+
+    const website = (index: number) => `https://resto-${index}.example/`;
+    const ENRICHABLE: DeckInput = {
+      ...STUB_DECK_INPUT,
+      restaurants: STUB_RESTAURANTS.map((r, i) => ({
+        ...r,
+        photoUrl: undefined,
+        website: website(i),
+      })),
+    };
+    let http: HttpTestingController;
+    /** Websites requested since the previous call (`match` hands each request once). */
+    const sent = () =>
+      http.match((r) => r.url === CARD_ENRICHMENT_URL).map((r) => r.request.params.get('website'));
+    const photo = () => root.querySelector('app-swipe-card img.photo')?.getAttribute('src');
+    const tablecloth = () => root.querySelector('app-swipe-card [data-testid="tablecloth"]');
+
+    async function answer(index: number, body: object | 'error'): Promise<void> {
+      const [request] = http.match(
+        (r) => r.url === CARD_ENRICHMENT_URL && r.params.get('website') === website(index),
+      );
+      if (body === 'error') {
+        request.flush(null, { status: 500, statusText: 'Server Error' });
+      } else {
+        request.flush(body);
+      }
+      await sleep(0);
+      await fixture.whenStable();
+    }
+
+    async function start(input = ENRICHABLE): Promise<void> {
+      await create(input);
+      http = TestBed.inject(HttpTestingController);
+    }
+
+    beforeEach(() => vi.stubGlobal('Image', FakeImage));
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('opens the deck with tablecloths while every request is pending, current card first (T17, T18, T27)', async () => {
+      await start();
+
+      expect(cardName()).toBe(STUB_RESTAURANTS[0].name);
+      expect(tablecloth()).not.toBeNull();
+      expect(sent()).toEqual([website(0), website(1), website(2)]);
+    });
+
+    it('sends no request for a restaurant with a data-source photo, which is kept (T4)', async () => {
+      await start({
+        ...STUB_DECK_INPUT,
+        restaurants: STUB_RESTAURANTS.map((r, i) => ({
+          ...r,
+          photoUrl: 'stub/restaurant.svg',
+          website: website(i),
+        })),
+      });
+
+      expect(sent()).toEqual([]);
+      expect(photo()).toBe(STUB_RESTAURANTS[0].photoUrl);
+    });
+
+    it('shows the photo in place, same card, position, reactions and deck state (T5, T19, SC-003)', async () => {
+      await start();
+      const deck = TestBed.inject(DeckStore);
+      const before = deck.state();
+
+      await answer(0, {
+        photoUrl: 'https://cdn.example/salle-0.jpg',
+        photoOrigin: 'SHARING_IMAGE',
+      });
+
+      expect(photo()).toBe('https://cdn.example/salle-0.jpg');
+      expect(cardName()).toBe(STUB_RESTAURANTS[0].name);
+      expect(text()).toContain('1 sur 15');
+      expect(reactions()).toEqual([]);
+      expect(deck.state()).toBe(before);
+    });
+
+    it('keeps a reaction made before the answer and shows the photo on rewind (T20, T23)', async () => {
+      await start();
+      await click(button(DECK_TEXTS.like));
+
+      await answer(0, {
+        photoUrl: 'https://cdn.example/salle-0.jpg',
+        photoOrigin: 'SHARING_IMAGE',
+      });
+
+      expect(reactions()).toEqual([{ restaurantId: 'stub-01', kind: 'liked' }]);
+      expect(cardName()).toBe(STUB_RESTAURANTS[1].name);
+      await click(button(DECK_TEXTS.rewind));
+      expect(cardName()).toBe(STUB_RESTAURANTS[0].name);
+      expect(photo()).toBe('https://cdn.example/salle-0.jpg');
+    });
+
+    it('gives each card its own result: card 2 failing does not stop cards 1 and 3 (T29)', async () => {
+      await start();
+      await answer(0, {
+        photoUrl: 'https://cdn.example/salle-0.jpg',
+        photoOrigin: 'SHARING_IMAGE',
+      });
+      await answer(1, 'error');
+      await answer(2, {
+        photoUrl: 'https://cdn.example/salle-2.jpg',
+        photoOrigin: 'LARGEST_PAGE_IMAGE',
+      });
+
+      expect(photo()).toBe('https://cdn.example/salle-0.jpg');
+      await click(button(DECK_TEXTS.like));
+      expect(tablecloth()).not.toBeNull();
+      await click(button(DECK_TEXTS.like));
+      expect(photo()).toBe('https://cdn.example/salle-2.jpg');
+      expect(text()).toContain('3 sur 15');
+    });
+
+    it('requests a restaurant brought by refinement (T22)', async () => {
+      TestBed.configureTestingModule({ providers: [{ provide: DECK_SIZE, useValue: 3 }] });
+      await start();
+      await answer(0, {});
+      await answer(1, {});
+      await answer(2, {});
+      vi.spyOn(refinement, 'refine').mockReturnValue(of([ENRICHABLE.restaurants[10]]));
+
+      await click(button(DECK_TEXTS.like));
+
+      expect(cardName()).toBe(STUB_RESTAURANTS[10].name);
+      expect(sent()).toEqual([website(10)]);
+    });
+
+    it('opens the website without reaction nor move: same card 3, same 2 reactions (T15, FR-008)', async () => {
+      await start();
+      await click(button(DECK_TEXTS.like));
+      await click(button(DECK_TEXTS.dislike));
+      const link = root.querySelector('app-swipe-card a.website') as HTMLAnchorElement;
+      link.addEventListener('click', (event) => event.preventDefault());
+
+      await click(link);
+
+      expect(cardName()).toBe(STUB_RESTAURANTS[2].name);
+      expect(text()).toContain('3 sur 15');
+      expect(reactions()).toEqual([
+        { restaurantId: 'stub-01', kind: 'liked' },
+        { restaurantId: 'stub-02', kind: 'disliked' },
+      ]);
     });
   });
 });

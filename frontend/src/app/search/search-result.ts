@@ -9,6 +9,18 @@ export interface OpeningPeriod {
   readonly closes: string;
 }
 
+/** Author of a Google photo (spec 008, Google `authorAttributions`). */
+export interface PhotoAttribution {
+  readonly displayName: string;
+  readonly uri?: string;
+}
+
+/** Third-party data provider Google requires to show with a place (spec 008, Google `attributions`). */
+export interface DataProvider {
+  readonly provider: string;
+  readonly providerUri?: string;
+}
+
 export interface MenuItem {
   readonly name: string;
   readonly description?: string;
@@ -29,6 +41,16 @@ export interface Restaurant {
   readonly signatureDish?: string;
   readonly address?: string;
   readonly phone?: string;
+  /** Spec 008: website of the restaurant. */
+  readonly website?: string;
+  /** Spec 008: Google place identifier. */
+  readonly placeId?: string;
+  /** Spec 008: authors of the photo. */
+  readonly photoAttributions?: readonly PhotoAttribution[];
+  /** Spec 008: the photo on Google Maps. */
+  readonly photoSourceUri?: string;
+  /** Spec 008: data providers to show with "Google Maps". */
+  readonly attributions?: readonly DataProvider[];
   readonly menu?: readonly MenuItem[];
 }
 

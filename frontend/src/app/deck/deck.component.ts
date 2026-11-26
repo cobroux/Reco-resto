@@ -3,10 +3,13 @@ import {
   Component,
   OnInit,
   computed,
+  effect,
   inject,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { CardEnrichmentStore } from '../enrichment/card-enrichment.store';
 import { canRewind, currentCard, position } from './deck-state';
 import { CookingSceneComponent } from './cooking-scene/cooking-scene.component';
 import { DeckStore } from './deck.store';
@@ -41,6 +44,8 @@ const SWIPE_BY_REACTION: Record<ReactionKind, Direction> = {
 export class DeckComponent implements OnInit {
   protected readonly store = inject(DeckStore);
   private readonly router = inject(Router);
+  /** Website photos of the cards (spec 007); kept apart from the deck state, which it never changes. */
+  protected readonly enrichment = inject(CardEnrichmentStore);
 
   protected readonly texts = DECK_TEXTS;
   /** Reaction buttons, in screen order (FR-004, D4). */
@@ -67,6 +72,21 @@ export class DeckComponent implements OnInit {
     const state = this.state();
     return !!state && canRewind(state) && !this.store.pending();
   });
+
+  constructor() {
+    // Spec 007 (FR-009, FR-010): once the deck is shown, ask for the photos of its cards, current card
+    // first, then the cards to come, then those already seen; again whenever refinement changes them (T22).
+    effect(() => {
+      const state = this.state();
+      if (!state) {
+        return;
+      }
+      const shown = state.shown.map((card) => card.restaurant).reverse();
+      untracked(() =>
+        this.enrichment.request([...shown.slice(0, 1), ...state.planned, ...shown.slice(1)]),
+      );
+    });
+  }
 
   ngOnInit(): void {
     this.store.start();
