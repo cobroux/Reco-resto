@@ -21,7 +21,9 @@ Images must be built for `linux/arm64` to run on this instance.
 1. **build**: builds both images for `linux/arm64` and pushes them to GitHub Container Registry (`ghcr.io/<owner>/reco-resto-<app>:<commit sha>` and `:latest`).
 2. **deploy**: copies `docker-compose.yml` to the instance over SSH, runs `docker compose pull` and `up -d` with the commit-SHA tag, then checks `http://<host>/api/hello`.
 
-The frontend container (nginx) is the only one published (port 80) and proxies `/api/` to the backend container (`frontend/nginx.conf`). Files: `docker-compose.yml`, `frontend/nginx.conf`.
+The Caddy container is the only one published (ports 80 and 443). It terminates HTTPS for `reco-resto.duckdns.org` (Let's Encrypt certificate, obtained and renewed automatically, stored in the `caddy_data` volume) and forwards to the frontend container (nginx), which proxies `/api/` to the backend container (`frontend/nginx.conf`). Files: `docker-compose.yml`, `frontend/nginx.conf`.
+
+The smoke test calls `https://reco-resto.duckdns.org/api/hello`, so the DuckDNS name must already point to the instance's public IP (see DuckDNS setup below).
 
 ### One-time setup
 
@@ -44,10 +46,17 @@ The frontend container (nginx) is the only one published (port 80) and proxies `
    - secret `UNSPLASH_ACCESS_KEY` (Unsplash application "Access Key", spec 007 amendment (b)): optional; blank means cards get no Unsplash cuisine photo. Never committed with a value, never sent to the browser nor logged. **Not yet written by `deploy.yml`**: add it to the GitHub secrets and to the `~/.env` lines of `.github/workflows/deploy.yml` (spec 007 plan OQ-10). Other settings `CARD_ENRICHMENT_UNSPLASH_BASE_URL`, `CARD_ENRICHMENT_UNSPLASH_APP_NAME` (`reco_resto`), `CARD_ENRICHMENT_UNSPLASH_PER_PAGE` (15), `CARD_ENRICHMENT_UNSPLASH_CACHE_TTL` (`1h`) have defaults in `application.yml`.
 4. **Images are public**: after the first run of `deploy.yml`, open each package (`reco-resto-backend`, `reco-resto-frontend`) in the GitHub organisation's Packages and set its visibility to public. The instance pulls them without authentication.
 
+### DuckDNS (HTTPS name)
+
+1. On https://www.duckdns.org create the sub-domain `reco-resto` and set its **current ip** to the instance's Elastic IP.
+2. Check it resolves: `nslookup reco-resto.duckdns.org 8.8.8.8`.
+3. Keep ports 80 and 443 open (Let's Encrypt validates over port 80).
+
 ## Known limits
 
-- HTTP only: add a domain and a certificate to serve HTTPS.
-- A single small instance, with no redundancy; its public IP changes on stop/start unless an Elastic IP is attached.
+- The DuckDNS name is hard-coded in `docker-compose.yml` (Caddy `--from`); changing the name means editing it there and in `deploy.yml` (smoke test).
+- Caddy reaches nginx over plain HTTP inside the Docker network.
+- A single small instance, with no redundancy; its public IP changes on stop/start unless an Elastic IP is attached (then DuckDNS must be updated).
 - The SSH host key is read with `ssh-keyscan` at each run (trust on first use), and port 22 is open to the Internet.
 - The instance is managed by hand: its configuration is not versioned in the repository.
 - Card enrichment (spec 007) makes outbound requests: HTTP/HTTPS to restaurant websites (ports 80/443) and, with a key, HTTPS to `api.unsplash.com`; the user's browser loads Unsplash photos directly from `images.unsplash.com`. The Unsplash demo limit is 50 requests per hour (answers are reused for 1 hour per cuisine, in memory); above it, cards keep the tablecloth.

@@ -80,7 +80,7 @@ jobs:
       - name: Smoke test
         run: |
           for i in $(seq 1 12); do
-            curl -fsS "http://${{ secrets.EC2_HOST }}/api/hello" && exit 0
+            curl -fsS "https://reco-resto.duckdns.org/api/hello" && exit 0
             sleep 10
           done
           exit 1

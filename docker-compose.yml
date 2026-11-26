@@ -16,5 +16,22 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    # No published port: only Caddy (HTTPS termination) reaches nginx.
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    # Gets and renews the Let's Encrypt certificate for the DuckDNS name by itself.
+    # The name must resolve to the instance's public IP (ports 80 and 443 open).
+    command: caddy reverse-proxy --from reco-resto.duckdns.org --to frontend:80
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      # Keeps the certificate across restarts (Let's Encrypt rate limits).
+      - caddy_data:/data
+
+volumes:
+  caddy_data:
