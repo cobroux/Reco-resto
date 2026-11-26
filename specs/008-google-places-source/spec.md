@@ -135,6 +135,10 @@ The team must be allowed to show Google data in Nappe. The terms researched on 2
 - **FR-016**: The system MUST NOT keep Google content longer than the terms allow (as researched: latitude and longitude at most 30 days, place identifier without limit; other content as stated by the current terms, to be confirmed by the team).
 - **FR-017**: The system MUST NOT return for one search more restaurants than the source returns for it (as researched: at most 20 results per page and 60 with pagination per Text Search); the deck (15 by default) and the zone list of feature 002 FR-013 are built from them.
 
+- **FR-018**: The deck MUST hold at most one restaurant per chain: the nearest one (smallest distance; on equal distances, the first in the order of the results). The freed slots MUST go to the next restaurants of the zone, so the deck still holds the deck size when enough restaurants exist. The zone list of feature 002 FR-013 (results map) is unchanged. Two restaurants are the same chain when they share any of: (1) the website host (lower case, without a leading `www.`), except generic hosts shared by unrelated businesses (configured list: at least Facebook, Instagram, Linktree, Google, Tripadvisor, TheFork/LaFourchette, Uber Eats, Deliveroo), which never group restaurants; per-site subdomains (for example `*.wixsite.com`) keep their full host; (2) the normalized name (lower case, accents, punctuation and extra spaces removed, the part after " - ", " | " or "(" dropped: "Big Mamma - East Mamma" gives "big mamma"); (3) a configured known chain name starting the normalized name (whole words).
+
+**Amendment (chains, product owner 2026-11-26)**: the deck showed several cards of the same chain (for example several Big Mamma or O'Tacos restaurants). Decision: one card per chain in the deck (FR-018); the zone list used by the results map keeps every restaurant. The initial list of known chain names in `application.yml` (`search.chains.known-names`) is a PROPOSAL to be confirmed by the product owner; the generic hosts are in `search.chains.generic-hosts`. Both lists are configuration. The Expected column of T48-T53 is derived from this decision.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Search criteria**: unchanged from feature 002 (cuisines, diets, AND/OR grouping, places, moment, distance limit, time on foot); produced by the language model, never containing data-source query text.
@@ -207,6 +211,12 @@ The Expected column was written by Claude at the explicit request of the product
 | T45 | FR-017 | limit: many matches | Search around Opéra where Google has more than 60 matching places; deck and zone list requested | The deck holds the deck size; the zone holds at most what Google returns (Nearby Search, D3: at most 20 places per search point) |
 | T46 | SC-001 | timing: reference sentence | Sentence "Je veux manger à opera", 3 runs, time from "Commencer" to the first card | Mean of the 3 runs under 20 s |
 | T47 | SC-002 | reliability | Same 3 runs; number of runs returning a deck | 3 runs out of 3 return a deck |
+| T48 | FR-018 | nominal: same website host | Zone with "East Mamma" (`https://www.bigmammagroup.com/east`, 800 m), "Libertino" (`http://bigmammagroup.com/libertino`, 300 m) and another restaurant | The deck holds "Libertino" and the other restaurant; the zone holds all three |
+| T49 | FR-018 | limit: generic host | Two unrelated restaurants whose websites are on `facebook.com` (and two on `tripadvisor.*`) | All of them stay in the deck |
+| T50 | FR-018 | limit: same normalized name | "Big Mamma - East Mamma" (900 m) and "BIG MAMMA \| Pink" (400 m) | Only "BIG MAMMA \| Pink" is in the deck |
+| T51 | FR-018 | limit: known chain, different names | "O'Tacos Châtelet" (700 m) and "O Tacos République" (250 m), "O'Tacos" known | Only "O Tacos République" is in the deck; "Paulette" is not the chain "Paul" |
+| T52 | FR-018 | limit: freed slots | Deck size 3; zone "Paul Opéra" 100 m, "Paul Louvre" 200 m, "A", "Paul Bastille", "B", "C" | Deck "Paul Opéra", "A", "B"; the zone is unchanged |
+| T53 | FR-018 | limit: no website, no name | Restaurants without website and without a usable name | No grouping: all of them stay in the deck |
 
 ## Impact on other features
 

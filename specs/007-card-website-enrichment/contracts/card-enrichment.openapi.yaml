@@ -1,0 +1,101 @@
+# Contract of feature 007 (card website enrichment). New endpoint; the search contract of 008
+# (specs/008-google-places-source/contracts/search-api.openapi.yaml) is unchanged.
+# Path and names approved at plan review (plan.md TC-2). Amendment (a) (2026-11-26): no language model; the
+# `name` parameter is removed and the photo origin MODEL_CHOICE becomes LARGEST_PAGE_IMAGE. Amendment (b) (2026-11-26):
+# Unsplash cuisine photo as the last resort: optional `cuisine` parameter, origin UNSPLASH_CUISINE_PHOTO and `credit`.
+openapi: 3.0.3
+info:
+  title: Reco-Resto card enrichment API
+  version: 0.1.0-draft
+paths:
+  /api/card-enrichment:
+    get:
+      summary: Photo for one restaurant card, taken from the restaurant's website (spec 007)
+      description: >-
+        Called by the frontend once per restaurant that has a website and no photo, after the deck is shown
+        (FR-009, FR-010). The backend reads the page at the website address (redirects followed, private and loopback
+        addresses refused, size cut), uses the declared sharing image when it answers as an image (FR-003), otherwise
+        the largest page image that answers as an image, chosen by the fixed rule of FR-004 (no language model, at
+        most 3 images checked); when the page was read but neither gives a displayable photo, a free Unsplash photo of
+        the restaurant cuisine with its credit (amendment (b), FR-013 to FR-016; only when an Unsplash key is
+        configured). The whole work, Unsplash request included, is abandoned after 5 s
+        (FR-011). Every failure, timeout or absence of image is a 200 without photo: the user never sees an error
+        (FR-012).
+      parameters:
+        - name: website
+          in: query
+          required: true
+          description: >-
+            The `Restaurant.website` value of the search response. Absolute http or https address with a host and no
+            user-info (plan.md research R3); port 80 or 443 only, explicit or implied by the scheme (decision PO-8).
+          schema: { type: string, format: uri, example: 'https://www.example-restaurant.fr/' }
+        - name: cuisine
+          in: query
+          required: false
+          description: >-
+            The `Restaurant.cuisine` value shown on the card (amendment (b)). Only used as the Unsplash search query
+            (lang fr); blank or absent gives the query "restaurant" (T38). It also selects the 1 h cache entry
+            (FR-016).
+          schema: { type: string, example: 'Restaurant italien' }
+      responses:
+        '200':
+          description: Enrichment done. `photoUrl` absent means "keep the tablecloth".
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CardEnrichment' }
+              examples:
+                sharingImage:
+                  value: { photoUrl: 'https://cdn.example.fr/salle.jpg', photoOrigin: SHARING_IMAGE }
+                largestPageImage:
+                  value: { photoUrl: 'https://www.example-restaurant.fr/img/salle.jpg', photoOrigin: LARGEST_PAGE_IMAGE }
+                unsplashCuisinePhoto:
+                  value:
+                    photoUrl: 'https://images.unsplash.com/photo-123?ixid=abc&w=1080'
+                    photoOrigin: UNSPLASH_CUISINE_PHOTO
+                    credit:
+                      photographerName: Jane Doe
+                      photographerUrl: 'https://unsplash.com/@janedoe?utm_source=reco_resto&utm_medium=referral'
+                      unsplashUrl: 'https://unsplash.com/?utm_source=reco_resto&utm_medium=referral'
+                noPhoto:
+                  value: {}
+        '400':
+          description: Missing or invalid website address (not http/https, relative, no host, user-info). No body.
+components:
+  schemas:
+    CardEnrichment:
+      type: object
+      additionalProperties: false
+      properties:
+        photoUrl:
+          type: string
+          format: uri
+          description: >-
+            Address of an image found in the website page (FR-006), absolute; or, for UNSPLASH_CUISINE_PHOTO, the
+            `urls.regular` address of the Unsplash photo (https only, hotlinked as Unsplash asks). Under decision PO-12 (a) it is the
+            address on the website (the browser loads it with referrerpolicy no-referrer); under PO-12 (b) it would
+            be a backend address serving that image.
+        photoOrigin:
+          type: string
+          enum: [SHARING_IMAGE, LARGEST_PAGE_IMAGE, UNSPLASH_CUISINE_PHOTO]
+          description: >-
+            Declared sharing image (FR-003), largest page image (FR-004) or Unsplash cuisine photo (FR-013). Present
+            exactly when photoUrl is present (spec "Card enrichment" entity).
+        credit:
+          $ref: '#/components/schemas/PhotoCredit'
+    PhotoCredit:
+      type: object
+      additionalProperties: false
+      description: >-
+        Present exactly when photoOrigin is UNSPLASH_CUISINE_PHOTO. Shown as "Photo : <photographerName> / Unsplash",
+        both links opening in a new tab (FR-015).
+      required: [photographerName, photographerUrl, unsplashUrl]
+      properties:
+        photographerName: { type: string, example: Jane Doe }
+        photographerUrl:
+          type: string
+          format: uri
+          description: Photographer profile on Unsplash, https, with utm_source=<app name>&utm_medium=referral.
+        unsplashUrl:
+          type: string
+          format: uri
+          description: https://unsplash.com/ with utm_source=<app name>&utm_medium=referral.

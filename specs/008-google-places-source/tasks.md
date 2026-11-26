@@ -336,19 +336,19 @@ Google attributions.
 
 ### Tests for User Story 2 frontend (write first, must fail)
 
-- [ ] T060 [P] [US2] Extend `frontend/src/app/search/deck-input.spec.ts` (T31, T32, T21): a response with
+- [x] T060 [P] [US2] Extend `frontend/src/app/search/deck-input.spec.ts` (T31, T32, T21): a response with
   `website`, `placeId`, `photoAttributions`, `photoSourceUri`, `attributions` maps without error; the deck id uses
   `placeId` when present (research R11), else `name|address`; a response without them maps as today.
-- [ ] T061 [P] [US2] Extend `frontend/src/app/deck/swipe-card/swipe-card.component.spec.ts` (T21, T22, T23, T24,
+- [x] T061 [P] [US2] Extend `frontend/src/app/deck/swipe-card/swipe-card.component.spec.ts` (T21, T22, T23, T24,
   T30): photo shown when `photoUrl` is set; an `error` event on the `<img>` shows the tablecloth (FR-010, T30); no
   photo → tablecloth (T22); opening tile hidden without hours (T23) and no price chip without price (T24) still hold.
 
 ### Implementation for User Story 2 frontend
 
-- [ ] T062 [P] [US2] Add the optional fields to `frontend/src/app/search/search-result.ts` and
+- [x] T062 [P] [US2] Add the optional fields to `frontend/src/app/search/search-result.ts` and
   `frontend/src/app/restaurant/restaurant.ts` (contracts/search-api.openapi.yaml `Restaurant`), map them in
   `frontend/src/app/search/deck-input.ts`. Makes T060 pass.
-- [ ] T063 [US2] Add the image error fallback in `frontend/src/app/deck/swipe-card/swipe-card.component.html` and
+- [x] T063 [US2] Add the image error fallback in `frontend/src/app/deck/swipe-card/swipe-card.component.html` and
   `swipe-card.component.ts`. Makes T061 pass.
 
 ---
@@ -362,17 +362,17 @@ terms (FR-016). Maps (FR-015, T42, T43) are deferred: out of scope.
 
 ### Tests for User Story 5 (write first, must fail)
 
-- [ ] T064 [P] [US5] Extend `frontend/src/app/deck/swipe-card/swipe-card.component.spec.ts` (T40, T41, SC-007):
+- [x] T064 [P] [US5] Extend `frontend/src/app/deck/swipe-card/swipe-card.component.spec.ts` (T40, T41, SC-007):
   the card front shows the text "Google Maps" on the photo area with `translate="no"` (D15, research R6), also on a
   card with the tablecloth; when `photoAttributions` is present, the author name(s) appear in small text under it,
   linked to `uri`; when `attributions` (data providers) is present, they are shown with "Google Maps".
 
 ### Implementation for User Story 5
 
-- [ ] T065 [US5] Implement the attribution in `swipe-card.component.html` / `.ts` and its style (discreet text,
+- [x] T065 [US5] Implement the attribution in `swipe-card.component.html` / `.ts` and its style (discreet text,
   D15; the "Google Maps" text is a frontend constant, not translated). Makes T064 pass. Screens of 005 and 006 are
   not touched (FR-015 deferred).
-- [ ] T066 [US5] Review for T44 (FR-016): confirm no file, database or browser storage receives Google content
+- [x] T066 [US5] Review for T44 (FR-016): confirm no file, database or browser storage receives Google content
   (search `localStorage`, `sessionStorage`, `IndexedDB`, file writes in backend and frontend), and backend logs
   contain place ids and counts only (covered by T020); record the outcome in the PR. The product owner checks
   T44 (spec: judgment test).
