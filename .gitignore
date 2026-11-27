@@ -123,3 +123,8 @@ secrets/
 .claude/settings.local.json
 .claude/worktrees/
 CLAUDE.local.md
+
+# Skill impeccable (copie locale, 18 Mo)
+.claude/skills/impeccable/
+.impeccable/
+graphify-out/

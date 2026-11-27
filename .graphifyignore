@@ -1,0 +1,8 @@
+specs/
+.claude/
+.specify/
+docs/
+*.md
+*.svg
+*.png
+*.json
