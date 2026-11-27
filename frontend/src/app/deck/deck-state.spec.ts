@@ -15,6 +15,7 @@ import {
   refinementRequest,
   returnFromPick,
   rewind,
+  swapRestaurants,
 } from './deck-state';
 
 function restaurants(count: number): Restaurant[] {
@@ -229,6 +230,41 @@ describe('deck-state', () => {
       const s = createDeck(restaurants(2), 15);
 
       expect(confirmPick(s)).toBe(s);
+    });
+  });
+
+  describe('swapRestaurants (walking distances arriving after the deck opened)', () => {
+    it('replaces the restaurants everywhere and keeps reactions, order and status', () => {
+      const original = restaurants(4);
+      const updated = original.map((r, i) => ({ ...r, distanceMeters: 500 + i }));
+      const reacted = react(createDeck(original, 4), 'liked');
+
+      const swapped = swapRestaurants(reacted, original, updated);
+
+      expect(swapped.shown).toEqual([{ restaurant: updated[0], reaction: 'liked' }, { restaurant: updated[1] }]);
+      expect(swapped.shown[0].restaurant).toBe(updated[0]);
+      expect(swapped.planned).toEqual(updated.slice(2));
+      expect(swapped.candidates).toEqual(updated);
+      expect(swapped.status).toBe(reacted.status);
+    });
+
+    it('matches by identity, so two restaurants with the same id keep their own update', () => {
+      const [a] = restaurants(1);
+      const twin = { ...a };
+      const state = createDeck([a, twin], 2);
+
+      const swapped = swapRestaurants(state, [a, twin], [{ ...a, distanceMeters: 1 }, { ...twin, distanceMeters: 2 }]);
+
+      expect(swapped.candidates.map((r) => r.distanceMeters)).toEqual([1, 2]);
+    });
+
+    it('keeps a restaurant it was not told about', () => {
+      const original = restaurants(2);
+      const state = createDeck(original, 2);
+
+      expect(swapRestaurants(state, [original[0]], [{ ...original[0], distanceMeters: 9 }]).planned[0]).toBe(
+        original[1],
+      );
     });
   });
 });

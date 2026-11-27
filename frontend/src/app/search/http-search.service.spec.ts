@@ -87,7 +87,11 @@ describe('HttpSearchService', () => {
       targetDateTime: '2026-11-28T12:00:00+01:00',
       userPosition: null,
       restaurants: [
-        expect.objectContaining({ id: 'Thai Garden|3 rue X', name: 'Thai Garden', distanceMeters: 200 }),
+        expect.objectContaining({
+          id: 'Thai Garden|3 rue X',
+          name: 'Thai Garden',
+          distanceMeters: 200,
+        }),
       ],
     });
     expect(complete).toHaveBeenCalledTimes(1);
@@ -152,9 +156,19 @@ describe('HttpSearchService', () => {
     const RESULT = {
       criteria: { diets: [] },
       deck: [
-        { name: 'Near', address: '1 rue A', distanceMeters: 100, location: { latitude: 48.86, longitude: 2.34 } },
+        {
+          name: 'Near',
+          address: '1 rue A',
+          distanceMeters: 100,
+          location: { latitude: 48.86, longitude: 2.34 },
+        },
         { name: 'Nowhere', address: '2 rue B', distanceMeters: 200 },
-        { name: 'Far', address: '3 rue C', distanceMeters: 300, location: { latitude: 48.85, longitude: 2.35 } },
+        {
+          name: 'Far',
+          address: '3 rue C',
+          distanceMeters: 300,
+          location: { latitude: 48.85, longitude: 2.35 },
+        },
       ],
     };
 
@@ -164,9 +178,26 @@ describe('HttpSearchService', () => {
       );
     }
 
+    const distancesOf = (input: { restaurants: { distanceMeters: number }[] }) =>
+      input.restaurants.map((r) => r.distanceMeters);
+
+    it('emits the deck input at once with the distances of the backend, without waiting for the routing service', async () => {
+      granted();
+      const next = vi.fn();
+      service.search(SENTENCE).subscribe({ next });
+
+      (await vi.waitFor(() => http.expectOne('/api/search'))).flush(RESULT);
+
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(distancesOf(next.mock.calls[0][0])).toEqual([100, 200, 300]);
+      await tableRequest();
+    });
+
     const tableRequest = () =>
       vi.waitFor(() =>
-        http.expectOne((req) => req.url.includes('/table/v1/foot/2.3376,48.8606;2.34,48.86;2.35,48.85')),
+        http.expectOne((req) =>
+          req.url.includes('/table/v1/foot/2.3376,48.8606;2.34,48.86;2.35,48.85'),
+        ),
       );
 
     it('replaces the straight-line distance by the walking one for the restaurants with coordinates', async () => {
@@ -177,9 +208,8 @@ describe('HttpSearchService', () => {
       (await vi.waitFor(() => http.expectOne('/api/search'))).flush(RESULT);
       (await tableRequest()).flush({ code: 'Ok', distances: [[0, 120.4, 410.7]] });
 
-      expect(next.mock.calls[0][0].restaurants.map((r: { distanceMeters: number }) => r.distanceMeters)).toEqual([
-        120.4, 200, 410.7,
-      ]);
+      expect(next).toHaveBeenCalledTimes(2);
+      expect(distancesOf(next.mock.calls[1][0])).toEqual([120.4, 200, 410.7]);
     });
 
     it('gives each restaurant its own walking distance even when two share an id', async () => {
@@ -189,17 +219,25 @@ describe('HttpSearchService', () => {
       const twins = {
         ...RESULT,
         deck: [
-          { name: 'Twin', address: '1 rue A', distanceMeters: 100, location: { latitude: 48.86, longitude: 2.34 } },
-          { name: 'Twin', address: '1 rue A', distanceMeters: 300, location: { latitude: 48.85, longitude: 2.35 } },
+          {
+            name: 'Twin',
+            address: '1 rue A',
+            distanceMeters: 100,
+            location: { latitude: 48.86, longitude: 2.34 },
+          },
+          {
+            name: 'Twin',
+            address: '1 rue A',
+            distanceMeters: 300,
+            location: { latitude: 48.85, longitude: 2.35 },
+          },
         ],
       };
 
       (await vi.waitFor(() => http.expectOne('/api/search'))).flush(twins);
       (await tableRequest()).flush({ code: 'Ok', distances: [[0, 120.4, 410.7]] });
 
-      expect(next.mock.calls[0][0].restaurants.map((r: { distanceMeters: number }) => r.distanceMeters)).toEqual([
-        120.4, 410.7,
-      ]);
+      expect(distancesOf(next.mock.calls[1][0])).toEqual([120.4, 410.7]);
     });
 
     it('keeps the distances of the backend when the routing service fails', async () => {
@@ -210,9 +248,8 @@ describe('HttpSearchService', () => {
       (await vi.waitFor(() => http.expectOne('/api/search'))).flush(RESULT);
       (await tableRequest()).flush('error', { status: 500, statusText: 'Server Error' });
 
-      expect(next.mock.calls[0][0].restaurants.map((r: { distanceMeters: number }) => r.distanceMeters)).toEqual([
-        100, 200, 300,
-      ]);
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(distancesOf(next.mock.calls[0][0])).toEqual([100, 200, 300]);
     });
 
     it('asks nothing to the routing service without the position of the user', async () => {

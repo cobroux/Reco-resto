@@ -1,6 +1,14 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
+import { DeckInput } from '../deck/deck.types';
 import { SearchResultStore } from '../search/search-result.store';
 import { SearchService } from '../search/search.service';
 import { DIET_TILES, HOME_TEXTS, TITLE_ROTATION_MS } from './home.texts';
@@ -59,14 +67,21 @@ export class HomeComponent {
     this.emptyError.set(false);
     this.searchError.set(false);
     this.searching.set(true);
+    let opened: DeckInput | null = null;
     this.searchService
       .search(this.sentence())
       .pipe(finalize(() => this.searching.set(false)))
       .subscribe({
-        // The deck opens on the result of this search (spec 003 FR-019, FR-020).
         next: (result) => {
-          this.results.set(result);
-          void this.router.navigate(['/deck']);
+          if (opened) {
+            // An updated version of the same search (walking distances): the deck is already open and keeps going.
+            this.results.replace(opened, result);
+          } else {
+            // The deck opens on the result of this search (spec 003 FR-019, FR-020).
+            this.results.set(result);
+            void this.router.navigate(['/deck']);
+          }
+          opened = result;
         },
         error: () => this.searchError.set(true),
       });

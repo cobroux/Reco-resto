@@ -105,5 +105,20 @@
 
 .recenter:hover,
 .recenter:focus-visible {
-  background: #4a3ba8;
+  background: var(--color-primary-strong);
+}
+
+.unavailable {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 16px;
+  background: var(--map-ground);
+  color: var(--color-muted);
+  font: inherit;
+  text-align: center;
 }

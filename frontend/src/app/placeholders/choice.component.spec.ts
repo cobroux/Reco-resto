@@ -5,7 +5,7 @@ import { vi } from 'vitest';
 import { DeckStore } from '../deck/deck.store';
 import { DECK_TEXTS } from '../deck/deck.texts';
 import { STUB_DECK_INPUT, STUB_RESTAURANTS } from '../deck/stub/stub-restaurants';
-import { WalkingRouteService } from '../map/walking-route.service';
+import { provideNoWalkingRoute } from '../map/walking-route.testing';
 import { Restaurant } from '../restaurant/restaurant';
 import { Position } from '../search/search-result';
 import { SearchResultStore } from '../search/search-result.store';
@@ -29,7 +29,7 @@ describe('ChoiceComponent', () => {
       imports: [ChoiceComponent],
       providers: [
         provideRouter([]),
-        { provide: WalkingRouteService, useValue: { route: () => of(null) } },
+        provideNoWalkingRoute(),
         { provide: DeckStore, useValue: { returnFromPick, state: () => ({ status }) } },
         {
           provide: ActivatedRoute,

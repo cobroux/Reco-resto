@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
-import { WalkingRouteService } from '../../map/walking-route.service';
+import { provideNoWalkingRoute } from '../../map/walking-route.testing';
 import { DECK_TEXTS, RESULTS_TEXTS } from '../../deck/deck.texts';
 import { STUB_RESTAURANTS } from '../../deck/stub/stub-restaurants';
 import { Restaurant } from '../restaurant';
@@ -34,7 +34,7 @@ vi.mock('maplibre-gl', async () => (await import('../../map/maplibre-gl.mock')).
 describe('RestaurantTileComponent', () => {
   beforeEach(() =>
     TestBed.configureTestingModule({
-      providers: [{ provide: WalkingRouteService, useValue: { route: () => of(null) } }],
+      providers: [provideNoWalkingRoute()],
     }),
   );
 

@@ -11,6 +11,10 @@ export const mapCalls = {
   fitBounds: [] as unknown[][],
   easeTo: [] as unknown[][],
   removedMaps: 0,
+  /** When true, the map never fires 'load' by itself (tiles not loaded yet). */
+  holdLoad: false,
+  /** When true, creating a map throws (no WebGL). */
+  failConstruct: false,
 };
 
 export function resetMapCalls(): void {
@@ -20,19 +24,28 @@ export function resetMapCalls(): void {
   mapCalls.fitBounds = [];
   mapCalls.easeTo = [];
   mapCalls.removedMaps = 0;
+  mapCalls.holdLoad = false;
+  mapCalls.failConstruct = false;
 }
 
 class FakeMap {
   private readonly listeners = new Map<string, Listener[]>();
   constructor(readonly options: Record<string, unknown>) {
+    if (mapCalls.failConstruct) {
+      throw new Error('WebGL unavailable');
+    }
     mapCalls.maps.push(this);
   }
   addControl(): void {}
   on(event: string, listener: Listener): void {
     this.listeners.set(event, [...(this.listeners.get(event) ?? []), listener]);
-    if (event === 'load') {
+    if (event === 'load' && !mapCalls.holdLoad) {
       listener();
     }
+  }
+  /** Fires the listeners of `event`, as MapLibre does (e.g. 'error' when the tiles cannot be fetched). */
+  emit(event: string): void {
+    (this.listeners.get(event) ?? []).forEach((listener) => listener());
   }
   getSource(): { setData: (data: unknown) => void } {
     return { setData: (data) => mapCalls.routes.push(data) };

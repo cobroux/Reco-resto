@@ -1,6 +1,16 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { catchError, from, map, Observable, of, switchMap, throwError } from 'rxjs';
+import {
+  EMPTY,
+  catchError,
+  concat,
+  filter,
+  from,
+  map,
+  Observable,
+  switchMap,
+  throwError,
+} from 'rxjs';
 import { DeckInput } from '../deck/deck.types';
 import { WalkingRouteService } from '../map/walking-route.service';
 import { toDeckInput } from './deck-input';
@@ -57,7 +67,9 @@ export class HttpSearchService extends SearchService {
           .post<SearchResult>('/api/search', position ? { sentence, position } : { sentence })
           .pipe(
             map((result) => toDeckInput(result, new Date(), position)),
-            switchMap((input) => this.withWalkingDistances(input)),
+            // The deck must not wait for the routing service (a third party): the first emission carries the distances
+            // of the backend, the second one, when the routing service answers, the walking distances.
+            switchMap((input) => concat([input], this.withWalkingDistances(input))),
           ),
       ),
       catchError((error: unknown) => throwError(() => failureOf(error))),
@@ -65,19 +77,24 @@ export class HttpSearchService extends SearchService {
   }
 
   /**
-   * Replaces the straight-line distance of each restaurant by its walking distance, the one the map shows, so that
-   * the deck, the results and the map give the same distance. A restaurant without coordinates, or that the routing
-   * service does not answer for, keeps the distance of the backend.
+   * Emits, at most once, the input with the straight-line distance of each restaurant replaced by its walking
+   * distance, the one the map shows, so that the deck, the results and the map give the same distance. A restaurant
+   * without coordinates, or that the routing service does not answer for, keeps the distance of the backend; nothing
+   * is emitted when no distance changes.
    */
   private withWalkingDistances(input: DeckInput): Observable<DeckInput> {
     const user = input.userPosition;
     const located = input.restaurants.filter((restaurant) => restaurant.location);
     if (!user || located.length === 0) {
-      return of(input);
+      return EMPTY;
     }
     return this.walking
-      .distances(user, located.map((restaurant) => restaurant.location!))
+      .distances(
+        user,
+        located.map((restaurant) => restaurant.location!),
+      )
       .pipe(
+        filter((distances) => distances.some((meters) => meters != null)),
         map((distances) => {
           // Keyed by the restaurant itself, not by its id: two restaurants can share an id (fallback id name|address).
           const walking = new Map(located.map((restaurant, i) => [restaurant, distances[i]]));

@@ -1,10 +1,10 @@
-import { Component, signal } from '@angular/core';
+import { ApplicationRef, Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Subject } from 'rxjs';
 import { vi } from 'vitest';
 import { Position } from '../search/search-result';
 import { mapCalls, resetMapCalls } from './maplibre-gl.mock';
-import { MAP_COLORS, MAP_STYLE, TILES_URL } from './map-style';
+import { MapColors, buildMapStyle, readMapColors } from './map-style';
 import { RestaurantMapComponent } from './restaurant-map.component';
 import { WalkingRoute, WalkingRouteService } from './walking-route.service';
 
@@ -63,6 +63,35 @@ describe('RestaurantMapComponent', () => {
   const click = (root: HTMLElement) =>
     root.querySelector<HTMLElement>('[data-testid="recenter-map"]')!.click();
 
+  it('shows a message instead of the map when the tiles cannot be loaded', async () => {
+    mapCalls.holdLoad = true;
+    const { root } = await create();
+    expect(root.querySelector('[data-testid="map-unavailable"]')).toBeNull();
+
+    mapCalls.maps[0].emit('error');
+    await TestBed.inject(ApplicationRef).whenStable();
+    TestBed.tick();
+
+    expect(root.querySelector('[data-testid="map-unavailable"]')?.textContent).toContain('carte');
+  });
+
+  it('shows the message when the map cannot be created', async () => {
+    mapCalls.failConstruct = true;
+    const { root } = await create();
+    TestBed.tick();
+
+    expect(root.querySelector('[data-testid="map-unavailable"]')).not.toBeNull();
+  });
+
+  it('keeps the map when an error comes after it loaded', async () => {
+    const { root } = await create();
+
+    mapCalls.maps[0].emit('error');
+    TestBed.tick();
+
+    expect(root.querySelector('[data-testid="map-unavailable"]')).toBeNull();
+  });
+
   it('starts a map centred on the restaurant and exposes its label', async () => {
     const { root } = await create();
 
@@ -76,7 +105,9 @@ describe('RestaurantMapComponent', () => {
 
     const [restaurant, user] = mapCalls.markers;
     expect(restaurant.element.className).toBe('restaurant-marker');
-    expect(restaurant.element.querySelector('.restaurant-name')?.textContent).toBe('Trattoria Verde');
+    expect(restaurant.element.querySelector('.restaurant-name')?.textContent).toBe(
+      'Trattoria Verde',
+    );
     expect(restaurant.lngLat).toEqual([RESTAURANT.longitude, RESTAURANT.latitude]);
     expect(user.element.className).toBe('user-marker');
     expect(user.lngLat).toEqual([USER.longitude, USER.latitude]);
@@ -119,7 +150,16 @@ describe('RestaurantMapComponent', () => {
       const { root } = await create();
 
       expect(mapCalls.routes.at(-1)).toMatchObject({
-        features: [{ geometry: { coordinates: [[USER.longitude, USER.latitude], [RESTAURANT.longitude, RESTAURANT.latitude]] } }],
+        features: [
+          {
+            geometry: {
+              coordinates: [
+                [USER.longitude, USER.latitude],
+                [RESTAURANT.longitude, RESTAURANT.latitude],
+              ],
+            },
+          },
+        ],
       });
       expect(root.querySelector('[data-testid="map-caption"]')?.textContent).toBe('350 m');
     });
@@ -131,8 +171,12 @@ describe('RestaurantMapComponent', () => {
       routeAnswer.next(ROUTE);
       await fixture.whenStable();
 
-      expect(mapCalls.routes.at(-1)).toMatchObject({ features: [{ geometry: { coordinates: ROUTE.coordinates } }] });
-      expect(root.querySelector('[data-testid="map-caption"]')?.textContent).toBe('17 min à pied · 1,3 km');
+      expect(mapCalls.routes.at(-1)).toMatchObject({
+        features: [{ geometry: { coordinates: ROUTE.coordinates } }],
+      });
+      expect(root.querySelector('[data-testid="map-caption"]')?.textContent).toBe(
+        '17 min à pied · 1,3 km',
+      );
       expect(mapCalls.fitBounds.length).toBeGreaterThan(0);
     });
 
@@ -161,7 +205,9 @@ describe('RestaurantMapComponent', () => {
     fixture.componentInstance.user.set(null);
     await fixture.whenStable();
 
-    expect(mapCalls.markers.map((marker) => marker.element.className)).toEqual(['restaurant-marker']);
+    expect(mapCalls.markers.map((marker) => marker.element.className)).toEqual([
+      'restaurant-marker',
+    ]);
     expect(mapCalls.routes.at(-1)).toEqual({ type: 'FeatureCollection', features: [] });
   });
 
@@ -240,7 +286,9 @@ describe('RestaurantMapComponent', () => {
     it('is labelled', async () => {
       const { root } = await create();
 
-      expect(root.querySelector('[data-testid="recenter-map"]')?.getAttribute('aria-label')).toBe('Recentrer');
+      expect(root.querySelector('[data-testid="recenter-map"]')?.getAttribute('aria-label')).toBe(
+        'Recentrer',
+      );
     });
 
     it('fits the restaurant and the user again when the user is known', async () => {
@@ -260,18 +308,46 @@ describe('RestaurantMapComponent', () => {
 
       click(root);
 
-      expect(mapCalls.easeTo).toEqual([[{ center: [RESTAURANT.longitude, RESTAURANT.latitude], zoom: 16 }]]);
+      expect(mapCalls.easeTo).toEqual([
+        [{ center: [RESTAURANT.longitude, RESTAURANT.latitude], zoom: 16 }],
+      ]);
     });
   });
 });
 
-describe('MAP_STYLE', () => {
-  it('uses the OpenFreeMap tiles and the flat colours of the mockup', () => {
-    expect(MAP_STYLE.sources['openmaptiles']).toEqual({ type: 'vector', url: TILES_URL });
-    const ground = MAP_STYLE.layers.find((layer) => layer.id === 'ground');
-    expect(ground?.paint).toEqual({ 'background-color': MAP_COLORS.ground });
-    const roads = MAP_STYLE.layers.filter((layer) => layer.id.startsWith('roads-'));
+describe('buildMapStyle', () => {
+  const COLORS: MapColors = {
+    ground: '#111111',
+    building: '#222222',
+    park: '#333333',
+    water: '#444444',
+    road: '#555555',
+    route: '#666666',
+  };
+
+  it('uses the given tiles and colours, ', () => {
+    const style = buildMapStyle('https://tiles.test', COLORS);
+
+    expect(style.sources['openmaptiles']).toEqual({ type: 'vector', url: 'https://tiles.test' });
+    const ground = style.layers.find((layer) => layer.id === 'ground');
+    expect(ground?.paint).toEqual({ 'background-color': COLORS.ground });
+    const roads = style.layers.filter((layer) => layer.id.startsWith('roads-'));
     expect(roads.length).toBe(2);
-    roads.forEach((layer) => expect(layer.paint?.['line-color' as never]).toBe(MAP_COLORS.road));
+    roads.forEach((layer) => expect(layer.paint?.['line-color' as never]).toBe(COLORS.road));
+  });
+});
+
+describe('readMapColors', () => {
+  it('reads the colours from the design tokens', () => {
+    const element = document.createElement('div');
+    element.style.setProperty('--map-ground', ' #aaa ');
+    element.style.setProperty('--color-primary', '#bbb');
+    document.body.append(element);
+
+    const colors = readMapColors(element);
+    element.remove();
+
+    expect(colors.ground).toBe('#aaa');
+    expect(colors.route).toBe('#bbb');
   });
 });

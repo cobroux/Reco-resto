@@ -46,6 +46,7 @@ export const DECK_TEXTS = {
 
 /** Texts of the results screen (wording from the Claude Design mockup "Web 2c · Résultats"). */
 export const RESULTS_TEXTS = {
+  mapUnavailable: 'La carte n’est pas disponible pour le moment.',
   title: (count: number, moment: string | null) =>
     `Vos ${count} coup${count > 1 ? 's' : ''} de cœur${moment ? ` ${moment}` : ''}`,
   decided: (name: string) => `C’est décidé : ${name} !`,

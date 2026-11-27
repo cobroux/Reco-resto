@@ -2,25 +2,32 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
-import {
-  MAX_WALKING_DISTANCES,
-  WALKING_ROUTE_TIMEOUT_MS,
-  WALKING_ROUTE_URL,
-  WALKING_TABLE_URL,
-  WalkingRoute,
-  WalkingRouteService,
-} from './walking-route.service';
+import { MAP_CONFIG } from './map-config.token';
+import { MAX_WALKING_DISTANCES, WalkingRoute, WalkingRouteService } from './walking-route.service';
 
 const FROM = { latitude: 48.8606, longitude: 2.3376 };
 const TO = { latitude: 48.8566, longitude: 2.3522 };
-const URL = `${WALKING_ROUTE_URL}/2.3376,48.8606;2.3522,48.8566`;
+const CONFIG = {
+  tilesUrl: 'https://tiles.test',
+  walkingBaseUrl: 'https://osrm.test/foot',
+  walkingTimeoutMs: 1234,
+};
+const ROUTE_URL = `${CONFIG.walkingBaseUrl}/route/v1/foot`;
+const TABLE_URL = `${CONFIG.walkingBaseUrl}/table/v1/foot`;
+const URL = `${ROUTE_URL}/2.3376,48.8606;2.3522,48.8566`;
 
 describe('WalkingRouteService', () => {
   let service: WalkingRouteService;
   let http: HttpTestingController;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: MAP_CONFIG, useValue: CONFIG },
+      ],
+    });
     service = TestBed.inject(WalkingRouteService);
     http = TestBed.inject(HttpTestingController);
   });
@@ -38,11 +45,25 @@ describe('WalkingRouteService', () => {
     expect(call.request.params.get('overview')).toBe('full');
     call.flush({
       code: 'Ok',
-      routes: [{ distance: 1256.5, duration: 1007.5, geometry: { coordinates: [[2.3376, 48.8606], [2.3522, 48.8566]] } }],
+      routes: [
+        {
+          distance: 1256.5,
+          duration: 1007.5,
+          geometry: {
+            coordinates: [
+              [2.3376, 48.8606],
+              [2.3522, 48.8566],
+            ],
+          },
+        },
+      ],
     });
 
     expect(route).toEqual({
-      coordinates: [[2.3376, 48.8606], [2.3522, 48.8566]],
+      coordinates: [
+        [2.3376, 48.8606],
+        [2.3522, 48.8566],
+      ],
       distanceMeters: 1256.5,
       durationSeconds: 1007.5,
     });
@@ -72,15 +93,16 @@ describe('WalkingRouteService', () => {
     service.route(FROM, TO).subscribe((value) => (route = value));
     request();
 
-    vi.advanceTimersByTime(WALKING_ROUTE_TIMEOUT_MS + 1);
+    vi.advanceTimersByTime(CONFIG.walkingTimeoutMs + 1);
 
     expect(route).toBeNull();
   });
 
   describe('distances', () => {
-    const TABLE = `${WALKING_TABLE_URL}/2.3376,48.8606;2.3522,48.8566;2.34,48.865`;
+    const TABLE = `${TABLE_URL}/2.3376,48.8606;2.3522,48.8566;2.34,48.865`;
     const OTHER = { latitude: 48.865, longitude: 2.34 };
-    const table = () => http.expectOne((req) => req.url === TABLE && req.params.get('sources') === '0');
+    const table = () =>
+      http.expectOne((req) => req.url === TABLE && req.params.get('sources') === '0');
 
     it('asks one matrix request from the user to every place and returns the distances in order', () => {
       let result: (number | null)[] | undefined;
@@ -109,7 +131,10 @@ describe('WalkingRouteService', () => {
       service.distances(FROM, [TO, OTHER]).subscribe((value) => results.push(value));
       table().flush({ code: 'Ok', distances: [[0, 1]] });
 
-      expect(results).toEqual([[null, null], [null, null]]);
+      expect(results).toEqual([
+        [null, null],
+        [null, null],
+      ]);
     });
 
     it('asks nothing when there is no place', () => {
@@ -125,9 +150,12 @@ describe('WalkingRouteService', () => {
       let result: (number | null)[] | undefined;
       service.distances(FROM, places).subscribe((value) => (result = value));
 
-      const call = http.expectOne((req) => req.url.startsWith(WALKING_TABLE_URL));
+      const call = http.expectOne((req) => req.url.startsWith(TABLE_URL));
       expect(call.request.url.split(';').length).toBe(MAX_WALKING_DISTANCES + 1);
-      call.flush({ code: 'Ok', distances: [[0, ...Array.from({ length: MAX_WALKING_DISTANCES }, () => 5)]] });
+      call.flush({
+        code: 'Ok',
+        distances: [[0, ...Array.from({ length: MAX_WALKING_DISTANCES }, () => 5)]],
+      });
 
       expect(result?.slice(-2)).toEqual([5, null]);
       expect(result?.length).toBe(MAX_WALKING_DISTANCES + 1);

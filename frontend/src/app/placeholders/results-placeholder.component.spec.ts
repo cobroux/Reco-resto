@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
-import { WalkingRouteService } from '../map/walking-route.service';
+import { provideNoWalkingRoute } from '../map/walking-route.testing';
 import { DECK_TEXTS, RESULTS_TEXTS } from '../deck/deck.texts';
 import { ReactionKind } from '../deck/deck.types';
 import { formatDistance } from '../deck/format/distance';
@@ -39,7 +39,7 @@ describe('ResultsPlaceholderComponent (results screen, mockup "Web 2c · Résult
     await fixture.whenStable();
   }
 
-  beforeEach(() => TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: WalkingRouteService, useValue: { route: () => of(null) } }] }));
+  beforeEach(() => TestBed.configureTestingModule({ providers: [provideRouter([]), provideNoWalkingRoute()] }));
 
   describe('header', () => {
     beforeEach(() => open([[first.id, 'liked']]));
@@ -75,7 +75,7 @@ describe('ResultsPlaceholderComponent (results screen, mockup "Web 2c · Résult
 
     it('leaves the moment out of the title when the search had none, and does not pluralize one', async () => {
       TestBed.resetTestingModule();
-      TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: WalkingRouteService, useValue: { route: () => of(null) } }] });
+      TestBed.configureTestingModule({ providers: [provideRouter([]), provideNoWalkingRoute()] });
       await open([[first.id, 'liked']], null);
 
       expect(text('h1')).toBe('Vos 1 coup de cœur');
@@ -96,7 +96,7 @@ describe('ResultsPlaceholderComponent (results screen, mockup "Web 2c · Résult
 
     it('uses the Nappe gingham as image while the restaurant has no photo', async () => {
       TestBed.resetTestingModule();
-      TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: WalkingRouteService, useValue: { route: () => of(null) } }] });
+      TestBed.configureTestingModule({ providers: [provideRouter([]), provideNoWalkingRoute()] });
       TestBed.inject(SearchResultStore).set(STUB_DECK_INPUT);
       TestBed.inject(SessionReactionsService).set(
         [{ ...first, photoUrl: undefined }],
@@ -112,7 +112,7 @@ describe('ResultsPlaceholderComponent (results screen, mockup "Web 2c · Résult
 
     it('shows the map of the restaurant and the user instead of the gingham when it has a location', async () => {
       TestBed.resetTestingModule();
-      TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: WalkingRouteService, useValue: { route: () => of(null) } }] });
+      TestBed.configureTestingModule({ providers: [provideRouter([]), provideNoWalkingRoute()] });
       TestBed.inject(SearchResultStore).set({
         ...STUB_DECK_INPUT,
         userPosition: { latitude: 48.86, longitude: 2.34 },

@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-24
 
-**Status**: Draft
+**Status**: Draft, implemented on this branch; awaiting teammate approval of the spec (the implementation was written before the approval, the Spec Kit order specify → plan → tasks → implement was not followed, see the PR description)
 
 **Input**: User description: "Spec 4 – End-of-swipe screen proposing the restaurants. At the end of the swipes, show a screen that displays our favorite results, places them on a map, and offers a filter on the preference type, or all the restaurants in the zone (even the refused ones, but greyed out)." MVP persona: "Philipe, 38, employee and tourist in Paris, wants to find a restaurant matching his tastes and diet; visualize several restaurants, select one, and get a route to it."
 
@@ -140,4 +140,16 @@ Philipe is not convinced: he restarts a deck on the same search, or starts a new
 - Map provider: the team asks for an open-source, customizable map, without an API key if possible; chosen at planning time.
 - Filtering may rely on the language model (product owner's suggestion); decided at planning time.
 - The route card shown next to the map is feature 006.
-- Privacy (walking routes and distances): the browser calls the community OSRM service `routing.openstreetmap.de` (pedestrian profile) directly. It receives the user's exact position with the restaurant's position (route), and with up to 99 restaurant positions on every search (distance matrix); the host also sees the user's IP address and user agent. Nothing in the UI tells the user this today. The service has no guaranteed availability and is meant to be replaced before a production release. *(To be validated by the team, as for the third parties of feature 002 (002 plan, O5). Options to keep the position inside our perimeter: proxy the calls through the backend, or self-host OSRM. The decision, and where the user-facing privacy notice lives, are still open; no privacy notice exists in the frontend yet.)*
+- Walking distances: the distance shown on the deck, the results and the map is the walking distance from the community OSRM service when it answers, and the distance of the backend (straight line) otherwise. **This replaces the backend distance of existing behaviour; accepted on 2026-11-27 by the author of the branch, to be confirmed by the reviewers on the PR.** The deck never waits for the routing service: it opens with the backend distances and takes the walking ones when they arrive, keeping its progress.
+- Configuration: the tiles URL (OpenFreeMap), the routing URL (`routing.openstreetmap.de/routed-foot`) and the routing timeout (8 s) live in one injection token (`MAP_CONFIG`, `frontend/src/app/map/map-config.token.ts`). **The 8 s timeout is an unvalidated placeholder: to be confirmed by the team.** Since the deck no longer waits, it only bounds the background call.
+- Map failure: when MapLibre cannot be loaded, the map cannot be created (no WebGL) or the style/tiles cannot be fetched before the first display, the map is replaced by the message "La carte n’est pas disponible pour le moment." (proposed wording, to be confirmed). The list and the rest of the screen stay usable. A tile that fails after the first display leaves the map in place.
+
+## Privacy
+
+For the MVP, the browser calls the community OSRM service `routing.openstreetmap.de` (pedestrian profile) directly, on every search:
+
+- it receives the user's exact position together with up to 99 restaurant positions (distance matrix) and, for the selected restaurant, the route from the user to it;
+- the host also sees the user's IP address and user agent;
+- the vector tiles come from `tiles.openfreemap.org`, which sees the IP address and the viewed area.
+
+**Accepted for the MVP on 2026-11-27 by the author of the branch (to be confirmed by the reviewers on the PR, as for the third parties of feature 002, 002 plan O5).** The service has no guaranteed availability and MUST be replaced before a production release: either proxy the calls through the backend or self-host OSRM. Nothing in the UI tells the user this today; a user-facing privacy notice is required before a production release (no privacy notice exists in the frontend yet; its location is still open).

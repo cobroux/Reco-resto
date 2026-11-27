@@ -16,7 +16,8 @@ import type maplibregl from 'maplibre-gl';
 import { RESULTS_TEXTS } from '../deck/deck.texts';
 import { formatDistance } from '../deck/format/distance';
 import { Position } from '../search/search-result';
-import { MAP_STYLE } from './map-style';
+import { MAP_CONFIG } from './map-config.token';
+import { buildMapStyle, readMapColors } from './map-style';
 import { WalkingRoute, WalkingRouteService } from './walking-route.service';
 
 /** Zoom used when only the restaurant is known (no position of the user). */
@@ -33,6 +34,9 @@ const toLngLat = (position: Position): [number, number] => [position.longitude, 
 @Component({
   selector: 'app-restaurant-map',
   template: `
+    @if (failed()) {
+      <p class="unavailable" role="status" data-testid="map-unavailable">{{ unavailableText }}</p>
+    }
     @if (shownCaption(); as text) {
       <span class="caption" data-testid="map-caption">{{ text }}</span>
     }
@@ -47,7 +51,12 @@ const toLngLat = (position: Position): [number, number] => [position.longitude, 
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
         <circle cx="12" cy="12" r="3.5" fill="currentColor" />
         <circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="2" />
-        <path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        <path
+          d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
       </svg>
     </button>
   `,
@@ -70,6 +79,10 @@ export class RestaurantMapComponent {
   private readonly mapContainer = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly pendingTasks = inject(PendingTasks);
   private readonly routes = inject(WalkingRouteService);
+  private readonly config = inject(MAP_CONFIG);
+  protected readonly unavailableText = RESULTS_TEXTS.mapUnavailable;
+  /** True when MapLibre or the first map data could not be loaded: a message replaces the map. */
+  protected readonly failed = signal(false);
   /** Walking route from the user to the restaurant; null while it is computed or when it is unavailable. */
   private readonly route = signal<WalkingRoute | null>(null);
   /** Framing input: flips once when the route first arrives (and back when it is reset), not on every redraw. */
@@ -101,7 +114,9 @@ export class RestaurantMapComponent {
       if (!user) {
         return;
       }
-      const subscription = this.routes.route(user, restaurant).subscribe((route) => this.route.set(route));
+      const subscription = this.routes
+        .route(user, restaurant)
+        .subscribe((route) => this.route.set(route));
       onCleanup(() => subscription.unsubscribe());
     });
     effect(() => {
@@ -131,20 +146,39 @@ export class RestaurantMapComponent {
   }
 
   private async start(): Promise<void> {
-    const { default: lib } = await import('maplibre-gl');
+    let lib: typeof maplibregl;
+    try {
+      ({ default: lib } = await import('maplibre-gl'));
+    } catch {
+      this.failed.set(true);
+      return;
+    }
     if (this.destroyed) {
       return;
     }
     this.lib = lib;
-    this.map = new lib.Map({
-      container: this.mapContainer.nativeElement,
-      style: MAP_STYLE,
-      center: toLngLat(this.restaurant()),
-      zoom: SINGLE_POINT_ZOOM,
-      attributionControl: { compact: true },
-    });
+    try {
+      this.map = new lib.Map({
+        container: this.mapContainer.nativeElement,
+        style: buildMapStyle(this.config.tilesUrl, readMapColors(this.mapContainer.nativeElement)),
+        center: toLngLat(this.restaurant()),
+        zoom: SINGLE_POINT_ZOOM,
+        attributionControl: { compact: true },
+      });
+    } catch {
+      // No WebGL, for example.
+      this.failed.set(true);
+      return;
+    }
     this.map.addControl(new lib.NavigationControl({ showCompass: false }), 'top-right');
     this.collapseAttribution();
+    // Before the first load, an error means the style or the tiles cannot be had: nothing useful can be shown. Later,
+    // a missing tile only leaves a hole in the ground, which the markers and the route still make usable.
+    this.map.on('error', () => {
+      if (!this.ready) {
+        this.failed.set(true);
+      }
+    });
     this.map.on('load', () => {
       this.collapseAttribution();
       this.ready = true;
@@ -175,7 +209,13 @@ export class RestaurantMapComponent {
     (map.getSource('route') as maplibregl.GeoJSONSource).setData({
       type: 'FeatureCollection',
       features: user
-        ? [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: this.path(user, restaurant) } }]
+        ? [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: { type: 'LineString', coordinates: this.path(user, restaurant) },
+            },
+          ]
         : [],
     });
   }
@@ -183,7 +223,9 @@ export class RestaurantMapComponent {
   /** The walking route when known, else a straight line (fallback while it is computed or unavailable). */
   private path(user: Position, restaurant: Position): [number, number][] {
     const route = this.route();
-    return route ? route.coordinates.map(([lng, lat]) => [lng, lat]) : [toLngLat(user), toLngLat(restaurant)];
+    return route
+      ? route.coordinates.map(([lng, lat]) => [lng, lat])
+      : [toLngLat(user), toLngLat(restaurant)];
   }
 
   private restaurantMarker(position: Position): maplibregl.Marker {

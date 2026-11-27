@@ -157,3 +157,23 @@ export function applyRefinement(state: DeckState, result: readonly Restaurant[])
 export function markRefinementFailed(state: DeckState): DeckState {
   return { ...state, refinementDegraded: true };
 }
+
+/**
+ * Replaces restaurants of the deck by an updated version of themselves (same position in `from` and `to`, matched by
+ * identity, not by id: two restaurants can share an id), keeping the reactions, the order and the status. Used when
+ * the walking distances arrive after the deck opened.
+ */
+export function swapRestaurants(
+  state: DeckState,
+  from: readonly Restaurant[],
+  to: readonly Restaurant[],
+): DeckState {
+  const replacement = new Map(from.map((restaurant, i) => [restaurant, to[i] ?? restaurant]));
+  const swap = (restaurant: Restaurant) => replacement.get(restaurant) ?? restaurant;
+  return {
+    ...state,
+    shown: state.shown.map((card) => ({ ...card, restaurant: swap(card.restaurant) })),
+    planned: state.planned.map(swap),
+    candidates: state.candidates.map(swap),
+  };
+}
