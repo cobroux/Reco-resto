@@ -1,5 +1,7 @@
 package hr.emocio.recoresto.search;
 
+import static hr.emocio.recoresto.search.llm.JsonAnswers.text;
+
 import hr.emocio.recoresto.search.api.Position;
 import hr.emocio.recoresto.search.api.SearchErrorCode;
 import hr.emocio.recoresto.search.api.SearchException;
@@ -7,28 +9,25 @@ import hr.emocio.recoresto.search.api.SearchRequest;
 import hr.emocio.recoresto.search.config.SearchProperties;
 import hr.emocio.recoresto.search.config.ToolSearchProperties;
 import hr.emocio.recoresto.search.criteria.MomentResolver;
-import hr.emocio.recoresto.search.criteria.SearchCriteria;
-import hr.emocio.recoresto.search.google.GooglePlace;
-import hr.emocio.recoresto.search.google.GooglePlaceMapper;
-import hr.emocio.recoresto.search.google.GooglePlaceTypes;
-import hr.emocio.recoresto.search.google.GooglePlacesClient;
 import hr.emocio.recoresto.search.llm.JsonAnswers;
 import hr.emocio.recoresto.search.llm.LlmChatClient;
-import hr.emocio.recoresto.search.restaurant.DeckSelector;
 import hr.emocio.recoresto.search.restaurant.Restaurant;
-import hr.emocio.recoresto.search.restaurant.RestaurantFilters;
 import hr.emocio.recoresto.search.restaurant.SearchResult;
+import hr.emocio.recoresto.search.tool.LlmTool;
+import hr.emocio.recoresto.search.tool.SearchRestaurantsTool;
+import hr.emocio.recoresto.search.tool.ToolContext;
+import hr.emocio.recoresto.search.tool.ToolRegistry;
+import hr.emocio.recoresto.search.tool.ToolRun;
 import java.time.Clock;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -36,37 +35,30 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The language model drives the search by tool calling (prototype, no spec).
+ * The language model drives the search by tool calling (prototype, no spec; tools in a registry since spec 009).
  * <ol>
  * <li>The model calls {@code search_restaurants} with the criteria it reads in the sentence.</li>
- * <li>The backend runs the tool: Google Text Search around the browser position (the model never gives a place),
- * then the strict filters (open, radius, diets, status, one per chain), and gives back compact candidates with short
- * ids ({@code r1}, {@code r2}...).</li>
+ * <li>The backend runs the tool ({@link SearchRestaurantsTool}): Google Text Search around the browser position (the
+ * model never gives a place), then the strict filters (open, radius, diets, status, one per chain), and gives back
+ * compact candidates with short ids ({@code r1}, {@code r2}...).</li>
  * <li>The model picks and ranks candidates by id, with a short reason; the backend builds the cards from the Google
  * data, so no restaurant can be invented.</li>
  * </ol>
- * At most {@code search.tool.max-rounds} model requests and {@code search.tool.max-tool-calls} searches. A model
- * that answers without searching did not take the sentence for a restaurant request: {@code NOT_UNDERSTOOD}. Any
- * failure of the model falls back to the backend: search with the raw sentence if the model never searched, backend
- * order if it never picked.
+ * At most {@code search.tool.max-rounds} model requests, and for each tool the number of calls it allows
+ * ({@link LlmTool#callLimit()}). A model that answers without searching did not take the sentence for a restaurant
+ * request: {@code NOT_UNDERSTOOD}. Any failure of the model falls back to the backend: search with the raw sentence if
+ * the model never searched, backend order if it never picked.
  */
 @Service
 public class SearchService {
 
     private static final Logger log = LoggerFactory.getLogger(SearchService.class);
 
-    private static final String TOOL_NAME = "search_restaurants";
-
-    private static final String GOOGLE_PRICE_PREFIX = "PRICE_LEVEL_";
-    /** Tool price names ("inexpensive"...) to Google levels, from the single table of {@link GooglePlaceMapper}. */
-    private static final Map<String, String> PRICE_LEVELS = GooglePlaceMapper.PRICE_LEVELS.keySet().stream()
-            .collect(Collectors.toMap(level -> level.substring(GOOGLE_PRICE_PREFIX.length()).toLowerCase(Locale.ROOT),
-                    level -> level));
-    /** The diets Google can state, from the single table of {@link GooglePlaceTypes}. */
-    private static final Set<String> DIETS = GooglePlaceTypes.DIET_TYPES.keySet();
-
     private static final DateTimeFormatter NOW_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm (EEEE)",
             Locale.ENGLISH);
+
+    /** What the model reads when it asks for an unknown tool or for one more call than a tool allows. */
+    private static final String NO_MORE_CALLS = "{\"error\":\"No more searches: give your final JSON answer now.\"}";
 
     private static final String SYSTEM_PROMPT = """
             You help a user in France find a restaurant from a sentence written in French.
@@ -92,50 +84,19 @@ public class SearchService {
             - reason: one short French sentence (at most 12 words) saying why this place matches the request,
               based only on the data given by the tool.""";
 
-    private static final List<Object> TOOLS = List.of(Map.of("type", "function", "function", Map.of(
-            "name", TOOL_NAME,
-            "description", "Searches restaurants around the user's position that are open at the given moment. "
-                    + "Returns candidates with an id, name, cuisine, price, rating, distance and summary.",
-            "parameters", Map.of(
-                    "type", "object",
-                    "properties", Map.of(
-                            "query", Map.of("type", "string",
-                                    "description", "Short French text of what to eat, or \"restaurant\""),
-                            "price_levels", Map.of("type", "array", "items", Map.of("type", "string", "enum",
-                                    sorted(PRICE_LEVELS.keySet()))),
-                            "open_at", Map.of("type", "string",
-                                    "description", "\"now\" or a local date-time such as 2026-11-28T12:30"),
-                            "radius_m", Map.of("type", "integer", "description", "Search radius in meters"),
-                            "walking_minutes", Map.of("type", "integer", "description", "Travel time on foot"),
-                            "diets", Map.of("type", "array", "items", Map.of("type", "string", "enum",
-                                    sorted(DIETS)))),
-                    "required", List.of("query")))));
-
-    /** One run of the tool: what was searched, and the candidates in backend order. */
-    private record ToolRun(SearchCriteria criteria, List<Restaurant> candidates, List<Restaurant> zone,
-            Map<String, JsonNode> rawById) {
-    }
-
     private final LlmChatClient llm;
-    private final GooglePlacesClient google;
-    private final GooglePlaceMapper placeMapper;
-    private final RestaurantFilters filters;
-    private final DeckSelector deckSelector;
-    private final MomentResolver momentResolver;
+    private final ToolRegistry registry;
+    private final SearchRestaurantsTool searchTool;
     private final SearchProperties properties;
     private final ToolSearchProperties limits;
     private final JsonMapper mapper;
     private final Clock clock;
 
-    public SearchService(LlmChatClient llm, GooglePlacesClient google, GooglePlaceMapper placeMapper,
-            RestaurantFilters filters, DeckSelector deckSelector, MomentResolver momentResolver,
+    public SearchService(LlmChatClient llm, ToolRegistry registry, SearchRestaurantsTool searchTool,
             SearchProperties properties, ToolSearchProperties limits, JsonMapper mapper, Clock clock) {
         this.llm = llm;
-        this.google = google;
-        this.placeMapper = placeMapper;
-        this.filters = filters;
-        this.deckSelector = deckSelector;
-        this.momentResolver = momentResolver;
+        this.registry = registry;
+        this.searchTool = searchTool;
         this.properties = properties;
         this.limits = limits;
         this.mapper = mapper;
@@ -153,13 +114,15 @@ public class SearchService {
         messages.add(Map.of("role", "system", "content", systemPrompt()));
         messages.add(Map.of("role", "user", "content", request.sentence()));
 
-        ToolRun last = null;
+        ToolContext context = new ToolContext(position);
+        List<Object> tools = registry.definitions();
+        Map<String, Integer> callsByTool = new HashMap<>();
         int toolCalls = 0;
         for (int round = 1; round <= limits.maxRounds(); round++) {
             long roundStart = System.nanoTime();
             JsonNode message;
             try {
-                message = llm.chat(messages, TOOLS);
+                message = llm.chat(messages, tools);
             } catch (SearchException e) {
                 log.warn("Agent round {} failed, falling back to the backend", round);
                 break;
@@ -169,133 +132,44 @@ public class SearchService {
             if (calls.isArray() && !calls.isEmpty()) {
                 messages.add(message);
                 for (JsonNode call : calls) {
+                    String name = call.path("function").path("name").asString();
                     String arguments = call.path("function").path("arguments").asString();
+                    LlmTool tool = registry.find(name).orElse(null);
                     String result;
-                    if (toolCalls < limits.maxToolCalls()
-                            && TOOL_NAME.equals(call.path("function").path("name").asString())) {
+                    if (tool != null && callsByTool.getOrDefault(name, 0) < tool.callLimit()) {
+                        callsByTool.merge(name, 1, Integer::sum);
                         toolCalls++;
                         log.debug("Agent tool call {}: {}", toolCalls, arguments);
-                        ToolRun run = runTool(arguments, position);
-                        // A new search replaces the previous one only when it found something (never lose results).
-                        if (last == null || !run.candidates().isEmpty()) {
-                            last = run;
-                        }
-                        result = forModel(run);
+                        result = tool.execute(arguments, context);
                     } else {
-                        result = "{\"error\":\"No more searches: give your final JSON answer now.\"}";
+                        result = NO_MORE_CALLS;
                     }
                     messages.add(Map.of("role", "tool", "tool_call_id", call.path("id").asString(), "content",
                             result));
                 }
                 continue;
             }
-            if (last == null) {
+            if (context.lastRun() == null) {
                 log.info("Agent round {}: the model answered without searching: not understood", round);
                 throw new SearchException(SearchErrorCode.NOT_UNDERSTOOD, "The sentence is not a restaurant request");
             }
-            SearchResult result = result(last, picks(message.path("content").asString(), last), includeZone);
-            log.info("Agent search done in {} ms ({} model rounds, {} searches)", millis(start), round, toolCalls);
+            SearchResult result = result(context.lastRun(), picks(message.path("content").asString(),
+                    context.lastRun()), includeZone);
+            log.info("Agent search done in {} ms ({} model rounds, {} tool calls)", millis(start), round, toolCalls);
             return result;
         }
-        if (last == null) {
+        if (context.lastRun() == null) {
             log.info("Agent fallback: search with the raw sentence");
-            last = runTool(mapper.writeValueAsString(Map.of("query", request.sentence())), position);
+            context.record(searchTool.run(mapper.writeValueAsString(Map.of("query", request.sentence())), position));
         }
         log.info("Agent fallback: backend order");
-        SearchResult result = result(last, List.of(), includeZone);
+        SearchResult result = result(context.lastRun(), List.of(), includeZone);
         log.info("Agent search done in {} ms (fallback)", millis(start));
         return result;
     }
 
     private String systemPrompt() {
         return SYSTEM_PROMPT.formatted(ZonedDateTime.now(clock.withZone(MomentResolver.ZONE)).format(NOW_FORMAT));
-    }
-
-    /** Runs the tool with checked arguments: anything invalid is dropped or clamped, never sent as is. */
-    private ToolRun runTool(String argumentsJson, Position position) {
-        long start = System.nanoTime();
-        JsonNode args = JsonAnswers.firstObject(mapper, argumentsJson).orElse(mapper.createObjectNode());
-
-        String query = text(args.path("query"));
-        query = query == null ? "restaurant" : query.substring(0, Math.min(query.length(), limits.maxQueryLength()));
-
-        List<String> googlePrices = new ArrayList<>();
-        args.path("price_levels").forEach(level -> {
-            String googleLevel = PRICE_LEVELS.get(level.asString().toLowerCase(Locale.ROOT));
-            if (googleLevel != null && !googlePrices.contains(googleLevel)) {
-                googlePrices.add(googleLevel);
-            }
-        });
-
-        List<String> diets = new ArrayList<>();
-        args.path("diets").forEach(diet -> {
-            String value = diet.asString().toLowerCase(Locale.ROOT);
-            if (DIETS.contains(value) && !diets.contains(value)) {
-                diets.add(value);
-            }
-        });
-
-        double radius = properties.defaultRadiusKm() * 1000;
-        if (args.path("radius_m").isNumber()) {
-            radius = args.path("radius_m").asDouble();
-        } else if (args.path("walking_minutes").isNumber()) {
-            radius = properties.walkingMeters(args.path("walking_minutes").asDouble());
-        }
-        radius = Math.clamp(radius, limits.minRadiusMeters(), limits.maxRadiusMeters());
-
-        String openAt = text(args.path("open_at"));
-        ZonedDateTime moment;
-        try {
-            moment = momentResolver.resolve(openAt);
-        } catch (SearchException unreadableOrPast) {
-            log.info("Agent tool: moment {} ignored, now used", openAt);
-            openAt = "now";
-            moment = momentResolver.resolve(null);
-        }
-
-        SearchCriteria criteria = new SearchCriteria(query, diets, openAt == null ? "now" : openAt,
-                (int) Math.round(radius));
-
-        List<JsonNode> raw = google.searchText(query, position, radius, googlePrices);
-        Map<String, JsonNode> rawById = new LinkedHashMap<>();
-        Map<String, GooglePlace> places = new LinkedHashMap<>();
-        for (JsonNode node : raw) {
-            placeMapper.map(node, List.of(position)).ifPresent(place -> {
-                if (place.id() != null && places.putIfAbsent(place.id(), place) == null) {
-                    rawById.put(place.id(), node);
-                }
-            });
-        }
-        List<Restaurant> kept = filters.apply(List.copyOf(places.values()), criteria, radius, moment);
-        DeckSelector.Selection selection = deckSelector.select(List.of(kept),
-                Math.max(limits.maxCandidates(), properties.deckSize()));
-        log.info("Agent tool: query of {} chars, prices {}, {} diets, radius {} m, moment {} -> Google {}, kept {}, "
-                + "candidates {} in {} ms", query.length(), googlePrices, diets.size(), Math.round(radius), moment,
-                raw.size(), kept.size(), selection.deck().size(), millis(start));
-        return new ToolRun(criteria, selection.deck(), selection.zone(), rawById);
-    }
-
-    /** The compact candidates the model reads: short ids, no address, no photo, no hours. */
-    private String forModel(ToolRun run) {
-        List<Map<String, Object>> candidates = new ArrayList<>();
-        for (int i = 0; i < run.candidates().size(); i++) {
-            Restaurant restaurant = run.candidates().get(i);
-            JsonNode raw = run.rawById().getOrDefault(restaurant.placeId(), mapper.createObjectNode());
-            Map<String, Object> candidate = new LinkedHashMap<>();
-            candidate.put("id", "r" + (i + 1));
-            candidate.put("name", restaurant.name());
-            putIfPresent(candidate, "cuisine", restaurant.cuisine());
-            putIfPresent(candidate, "price", restaurant.priceLevel());
-            if (raw.path("rating").isNumber()) {
-                candidate.put("rating", raw.path("rating").asDouble());
-                candidate.put("reviews", raw.path("userRatingCount").asInt(0));
-            }
-            putIfPresent(candidate, "distance_m", restaurant.distanceMeters());
-            putIfPresent(candidate, "diets", restaurant.diets());
-            putIfPresent(candidate, "summary", text(raw.path("editorialSummary").path("text")));
-            candidates.add(candidate);
-        }
-        return mapper.writeValueAsString(Map.of("count", candidates.size(), "candidates", candidates));
     }
 
     /** The model's picks as candidate indexes with their reason, in the model's order; unknown ids are ignored. */
@@ -349,20 +223,6 @@ public class SearchService {
             throw new SearchException(SearchErrorCode.NO_RESULT, "No restaurant matches the search");
         }
         return new SearchResult(run.criteria(), deck, includeZone ? run.zone() : null);
-    }
-
-    private static List<String> sorted(Set<String> values) {
-        return values.stream().sorted().toList();
-    }
-
-    private static void putIfPresent(Map<String, Object> map, String key, Object value) {
-        if (value != null && !(value instanceof List<?> list && list.isEmpty())) {
-            map.put(key, value);
-        }
-    }
-
-    private static String text(JsonNode node) {
-        return node.isString() && !node.asString().isBlank() ? node.asString().trim() : null;
     }
 
     private static long millis(long startNanos) {

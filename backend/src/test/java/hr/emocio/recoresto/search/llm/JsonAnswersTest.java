@@ -38,6 +38,18 @@ class JsonAnswersTest {
     }
 
     @Test
+    void textIsTheTrimmedNonBlankString() {
+        assertThat(JsonAnswers.text(mapper.readTree("\"  pizza \""))).isEqualTo("pizza");
+    }
+
+    @Test
+    void textIsNullWhenBlankMissingOrNotAString() {
+        assertThat(JsonAnswers.text(mapper.readTree("\"   \""))).isNull();
+        assertThat(JsonAnswers.text(mapper.readTree("12"))).isNull();
+        assertThat(JsonAnswers.text(mapper.readTree("{}").path("absent"))).isNull();
+    }
+
+    @Test
     void noObjectGivesEmpty() {
         assertThat(JsonAnswers.firstObject(mapper, "no object here")).isEmpty();
         assertThat(JsonAnswers.firstObject(mapper, "[1, 2]")).isEmpty();

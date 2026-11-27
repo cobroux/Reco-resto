@@ -52,6 +52,11 @@ public final class JsonAnswers {
         return Optional.empty();
     }
 
+    /** The trimmed text of a JSON string node; null when the node is missing, not a string, or blank. */
+    public static String text(JsonNode node) {
+        return node.isString() && !node.asString().isBlank() ? node.asString().trim() : null;
+    }
+
     private static Optional<JsonNode> readObject(JsonMapper mapper, String text) {
         try {
             JsonNode node = mapper.readTree(text);

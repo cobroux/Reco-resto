@@ -1,0 +1,21 @@
+# Delta of specs/008-google-places-source/contracts/search-api.openapi.yaml (spec 009, FR-007).
+# Only the two properties below are added to components.schemas.Restaurant; nothing else changes.
+# Review text is never part of any answer.
+openapi: 3.0.3
+info:
+  title: Reco-Resto search API, rating fields (delta)
+  version: 009-delta
+paths: {}
+components:
+  schemas:
+    Restaurant:
+      type: object
+      description: Additional optional properties of the Restaurant schema of spec 008.
+      properties:
+        rating:
+          type: number
+          format: double
+          description: Google user rating of the restaurant; absent when Google gives none
+        ratingCount:
+          type: integer
+          description: Number of Google ratings behind `rating`; absent when Google gives none

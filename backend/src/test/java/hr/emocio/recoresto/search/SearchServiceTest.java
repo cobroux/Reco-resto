@@ -30,6 +30,8 @@ import hr.emocio.recoresto.search.restaurant.DeckSelector;
 import hr.emocio.recoresto.search.restaurant.Restaurant;
 import hr.emocio.recoresto.search.restaurant.RestaurantFilters;
 import hr.emocio.recoresto.search.restaurant.SearchResult;
+import hr.emocio.recoresto.search.tool.SearchRestaurantsTool;
+import hr.emocio.recoresto.search.tool.ToolRegistry;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -64,9 +66,18 @@ class SearchServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SearchService(llm, google, new GooglePlaceMapper(TestCardEnrichmentProperties.defaults()),
+        service = serviceWithDeckSize(DECK_SIZE);
+    }
+
+    /** The service as Spring builds it: the registry holds the restaurant search tool, the real filters and deck. */
+    private SearchService serviceWithDeckSize(int deckSize) {
+        SearchProperties properties = new SearchProperties(2.5, deckSize, 5);
+        SearchRestaurantsTool searchTool = new SearchRestaurantsTool(google,
+                new GooglePlaceMapper(TestCardEnrichmentProperties.defaults()),
                 new RestaurantFilters(new CriteriaMatcher()), new DeckSelector(new ChainProperties(null, null)),
-                new MomentResolver(CLOCK), new SearchProperties(2.5, DECK_SIZE, 5), LIMITS, mapper, CLOCK);
+                new MomentResolver(CLOCK), properties, LIMITS, mapper);
+        return new SearchService(llm, new ToolRegistry(List.of(searchTool)), searchTool, properties, LIMITS, mapper,
+                CLOCK);
     }
 
     private SearchResult search(String sentence) {
@@ -241,6 +252,40 @@ class SearchServiceTest {
         verify(google, never()).searchText(eq("c"), any(), anyDouble(), anyList());
     }
 
+    /** Spec 009 US2: a call to a tool that does not exist gets the error text and does not use up a search. */
+    @Test
+    void anUnknownToolGetsTheErrorTextAndDoesNotUseUpASearch() {
+        googleFinds(1);
+        JsonNode unknown = json("{\"role\":\"assistant\",\"tool_calls\":[{\"id\":\"c0\",\"type\":\"function\","
+                + "\"function\":{\"name\":\"book_table\",\"arguments\":\"{}\"}}]}");
+        when(llm.chat(anyList(), anyList())).thenReturn(unknown, toolCall("{\"query\":\"a\"}"),
+                answer("{\"picks\":[]}"));
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Object>> messages = ArgumentCaptor.forClass(List.class);
+
+        assertThat(names(search("a"))).containsExactly("Resto 1");
+
+        verify(llm, times(3)).chat(messages.capture(), anyList());
+        assertThat(messages.getValue()).anySatisfy(m -> assertThat(m).isInstanceOfSatisfying(Map.class,
+                map -> assertThat(String.valueOf(map.get("content"))).contains("No more searches")));
+        verify(google, times(1)).searchText(anyString(), any(), anyDouble(), anyList());
+    }
+
+    /** Spec 009 US2: every model request carries the definitions of all the registered tools. */
+    @Test
+    void everyRequestCarriesTheDefinitionsOfTheRegisteredTools() {
+        googleFinds(1);
+        when(llm.chat(anyList(), anyList())).thenReturn(toolCall("{\"query\":\"a\"}"), answer("{\"picks\":[]}"));
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Object>> tools = ArgumentCaptor.forClass(List.class);
+
+        search("a");
+
+        verify(llm, times(2)).chat(anyList(), tools.capture());
+        assertThat(tools.getValue()).hasSize(1);
+        assertThat(tools.getValue().getFirst().toString()).contains("search_restaurants");
+    }
+
     /** PR #18 review: an empty second search must not discard the candidates of the first one. */
     @Test
     void anEmptySecondSearchKeepsTheCandidatesOfTheFirst() {
@@ -268,9 +313,7 @@ class SearchServiceTest {
     /** PR #18 review: the number of candidates never caps a deck size above 20. */
     @Test
     void aDeckSizeAboveTwentyIsHonoured() {
-        service = new SearchService(llm, google, new GooglePlaceMapper(TestCardEnrichmentProperties.defaults()),
-                new RestaurantFilters(new CriteriaMatcher()), new DeckSelector(new ChainProperties(null, null)),
-                new MomentResolver(CLOCK), new SearchProperties(2.5, 25, 5), LIMITS, mapper, CLOCK);
+        service = serviceWithDeckSize(25);
         googleFinds(25); // up to about 2.5 km away: searched within 5 km
         when(llm.chat(anyList(), anyList())).thenReturn(toolCall("{\"query\":\"a\",\"radius_m\":5000}"),
                 answer("{\"picks\":[]}"));
@@ -286,19 +329,26 @@ class SearchServiceTest {
                 toolCall("{\"query\":\"ramen secret\",\"diets\":[\"halal\"]}"), answer("{\"picks\":[]}"),
                 toolCall("{\"query\":\"ramen secret\"}"),
                 answer("{\"picks\":[{\"id\":\"r1\",\"reason\":\"raison secrete\"}]}"));
+        // The search loop and the restaurant search tool (moved by spec 009) both log.
         Logger logger = (Logger) LoggerFactory.getLogger(SearchService.class);
+        Logger toolLogger = (Logger) LoggerFactory.getLogger(SearchRestaurantsTool.class);
         Level before = logger.getLevel();
+        Level toolBefore = toolLogger.getLevel();
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.start();
         logger.addAppender(appender);
+        toolLogger.addAppender(appender);
         logger.setLevel(Level.INFO);
+        toolLogger.setLevel(Level.INFO);
         try {
             // halal: no candidate left, the search ends in NO_RESULT; then a search that finds restaurants
             assertThatThrownBy(() -> search("ramen secret halal")).isInstanceOf(SearchException.class);
             assertThat(names(search("ramen secret"))).contains("Resto 1");
         } finally {
             logger.detachAppender(appender);
+            toolLogger.detachAppender(appender);
             logger.setLevel(before);
+            toolLogger.setLevel(toolBefore);
         }
 
         assertThat(appender.list).isNotEmpty().allSatisfy(event -> assertThat(event.getFormattedMessage())

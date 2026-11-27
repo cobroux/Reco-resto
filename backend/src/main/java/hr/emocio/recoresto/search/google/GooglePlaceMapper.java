@@ -1,5 +1,7 @@
 package hr.emocio.recoresto.search.google;
 
+import static hr.emocio.recoresto.search.llm.JsonAnswers.text;
+
 import hr.emocio.recoresto.search.api.Position;
 import hr.emocio.recoresto.search.config.CardEnrichmentProperties;
 import hr.emocio.recoresto.search.enrichment.WebsiteAddress;
@@ -152,9 +154,5 @@ public class GooglePlaceMapper {
             }
         });
         return types;
-    }
-
-    private static String text(JsonNode node) {
-        return node.isString() && !node.asString().isBlank() ? node.asString().trim() : null;
     }
 }
