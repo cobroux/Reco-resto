@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
+import { googleMapsRouteUrl } from '../../../restaurant/google-maps';
 import { Restaurant } from '../../../restaurant/restaurant';
 import { DECK_TEXTS } from '../../deck.texts';
 import { RoutePreview, RoutePreviewService } from '../../route-preview.service';
@@ -82,11 +83,12 @@ describe('RoutePreviewComponent (spec 004, US2)', () => {
     expect(root.querySelector('a.full-route')).not.toBeNull();
   });
 
-  it('has a button to the full route screen of this restaurant (FR-007)', async () => {
+  it('opens the full route of this restaurant in Google Maps (FR-007)', async () => {
     await create(of({ modes: [] }));
     const link = root.querySelector('a.full-route');
 
-    expect(link?.getAttribute('href')).toBe('/route/stub-01');
+    expect(link?.getAttribute('href')).toBe(googleMapsRouteUrl(RESTAURANT));
+    expect(link?.getAttribute('target')).toBe('_blank');
     expect(link?.textContent).toContain(DECK_TEXTS.fullRoute);
   });
 });

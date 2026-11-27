@@ -8,6 +8,7 @@ import { ReactionKind } from '../deck/deck.types';
 import { formatDistance } from '../deck/format/distance';
 import { closingTimeAt } from '../deck/format/opening';
 import { STUB_DECK_INPUT, STUB_RESTAURANTS } from '../deck/stub/stub-restaurants';
+import { googleMapsRouteUrl } from '../restaurant/google-maps';
 import { SearchResultStore } from '../search/search-result.store';
 import { SessionReactionsService } from '../session/session-reactions.service';
 import { ResultsPlaceholderComponent } from './results-placeholder.component';
@@ -215,7 +216,9 @@ describe('ResultsPlaceholderComponent (results screen, mockup "Web 2c · Résult
         expect(text('h1')).toBe(RESULTS_TEXTS.decided(first.name));
         expect(text('.subtitle')).toBe(RESULTS_TEXTS.decidedSubtitle);
         expect(q('[data-testid="top-card"] .badge')?.textContent?.trim()).toBe(DECK_TEXTS.pick);
-        expect(q('[data-testid="itinerary"]')?.getAttribute('href')).toBe(`/route/${first.id}`);
+        const itinerary = q('[data-testid="itinerary"]');
+        expect(itinerary?.getAttribute('href')).toBe(googleMapsRouteUrl(first));
+        expect(itinerary?.getAttribute('target')).toBe('_blank');
         expect(q('[data-testid="go-top"]')).toBeNull();
         expect(text('.others-title')).toBe(RESULTS_TEXTS.othersDecided);
         expect(text('[data-testid="nope-toggle"]')).toContain('Pas miam · 2');

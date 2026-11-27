@@ -8,7 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param minRadiusMeters smallest search radius the model may ask for
  * @param maxRadiusMeters largest search radius the model may ask for
  * @param maxQueryLength longest text sent to Google Text Search, in characters
- * @param maxReasonLength longest reason shown on a card, in characters
+ * @param maxReasonLength longest reason or dish ("À goûter") of the model shown on a card, in characters
  * @param maxCandidates candidates shown to the model (at least the deck size is always kept)
  * @param maxRounds model requests of one search
  * @param maxToolCalls searches the model may run for one sentence

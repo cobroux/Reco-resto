@@ -12,6 +12,7 @@ import { ReactionKind } from '../deck/deck.types';
 import { RestaurantDetailComponent } from '../restaurant/restaurant-detail/restaurant-detail.component';
 import { RestaurantTileComponent } from '../restaurant/restaurant-tile/restaurant-tile.component';
 import { RestaurantView, toRestaurantView } from '../restaurant/restaurant-view';
+import { googleMapsRouteUrl } from '../restaurant/google-maps';
 import { SearchResultStore } from '../search/search-result.store';
 import { SessionReactionsService } from '../session/session-reactions.service';
 
@@ -44,6 +45,7 @@ export class ResultsPlaceholderComponent {
 
   protected readonly texts = DECK_TEXTS;
   protected readonly results = RESULTS_TEXTS;
+  protected readonly mapsUrl = googleMapsRouteUrl;
   protected readonly hearts = HEARTS;
 
   protected readonly expandedId = signal<string | null>(null);

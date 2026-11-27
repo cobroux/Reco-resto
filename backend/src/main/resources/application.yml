@@ -8,7 +8,7 @@ search:
     # Radius the model may ask for, in meters.
     min-radius-meters: 300
     max-radius-meters: 5000
-    # Longest text sent to Google Text Search, and longest reason shown on a card, in characters.
+    # Longest text sent to Google Text Search, and longest reason or dish shown on a card, in characters.
     max-query-length: 100
     max-reason-length: 120
     # Candidates shown to the model (never fewer than the deck size).

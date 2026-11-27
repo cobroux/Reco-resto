@@ -3,11 +3,12 @@ import {
   Component,
   DestroyRef,
   OnInit,
+  computed,
   inject,
   input,
   signal,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { googleMapsRouteUrl } from '../../../restaurant/google-maps';
 import { Restaurant } from '../../../restaurant/restaurant';
 import { DECK_TEXTS } from '../../deck.texts';
 import { RoutePreview, RoutePreviewService } from '../../route-preview.service';
@@ -20,7 +21,6 @@ type Status = 'loading' | 'loaded' | 'failed';
  */
 @Component({
   selector: 'app-route-preview',
-  imports: [RouterLink],
   templateUrl: './route-preview.component.html',
   styleUrl: './route-preview.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -32,6 +32,7 @@ export class RoutePreviewComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly texts = DECK_TEXTS;
+  protected readonly mapsUrl = computed(() => googleMapsRouteUrl(this.restaurant()));
   protected readonly status = signal<Status>('loading');
   protected readonly preview = signal<RoutePreview>({ modes: [] });
 

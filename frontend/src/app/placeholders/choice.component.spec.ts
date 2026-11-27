@@ -6,6 +6,7 @@ import { DeckStore } from '../deck/deck.store';
 import { DECK_TEXTS } from '../deck/deck.texts';
 import { STUB_DECK_INPUT, STUB_RESTAURANTS } from '../deck/stub/stub-restaurants';
 import { provideNoWalkingRoute } from '../map/walking-route.testing';
+import { googleMapsRouteUrl } from '../restaurant/google-maps';
 import { Restaurant } from '../restaurant/restaurant';
 import { Position } from '../search/search-result';
 import { SearchResultStore } from '../search/search-result.store';
@@ -68,11 +69,12 @@ describe('ChoiceComponent', () => {
     expect(root.querySelector('.tablecloth')).toBeNull();
   });
 
-  it('links the itinerary to the route screen', async () => {
+  it('opens the itinerary in Google Maps', async () => {
     const { root } = await render('stub-02');
 
     const link = root.querySelector('[data-testid="itinerary"]') as HTMLAnchorElement;
-    expect(link.getAttribute('href')).toBe('/route/stub-02');
+    expect(link.getAttribute('href')).toBe(googleMapsRouteUrl(STUB_RESTAURANTS[1]));
+    expect(link.getAttribute('target')).toBe('_blank');
   });
 
   it('changes mind through the store', async () => {

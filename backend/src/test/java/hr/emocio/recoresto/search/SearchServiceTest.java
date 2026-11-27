@@ -100,17 +100,18 @@ class SearchServiceTest {
     }
 
     @Test
-    void theModelSearchesThenItsPicksComeFirstWithTheirReasonAndTheDeckIsCompleted() {
+    void theModelSearchesThenItsPicksComeFirstWithTheirReasonAndDishAndTheDeckIsCompleted() {
         googleFinds(3);
         when(llm.chat(anyList(), anyList())).thenReturn(
                 toolCall("{\"query\":\"burger\",\"price_levels\":[\"inexpensive\",\"cheap\"],\"radius_m\":800}"),
-                answer("{\"picks\":[{\"id\":\"r2\",\"reason\":\"Burger maison\"}]}"));
+                answer("{\"picks\":[{\"id\":\"r2\",\"reason\":\"Burger maison\",\"dish\":\"Cheeseburger\"}]}"));
 
         SearchResult result = search("un burger pas cher à moins de 800 m");
 
         verify(google).searchText("burger", HERE, 800.0, List.of("PRICE_LEVEL_INEXPENSIVE"));
         assertThat(names(result)).containsExactly("Resto 2", "Resto 1", "Resto 3");
         assertThat(result.deck()).extracting(Restaurant::reason).containsExactly("Burger maison", null, null);
+        assertThat(result.deck()).extracting(Restaurant::signatureDish).containsExactly("Cheeseburger", null, null);
         assertThat(result.criteria().query()).isEqualTo("burger");
         assertThat(result.criteria().distanceLimitMeters()).isEqualTo(800);
         assertThat(result.criteria().moment()).isEqualTo("now");
@@ -130,17 +131,18 @@ class SearchServiceTest {
     }
 
     @Test
-    void unknownRepeatedOrMalformedIdsAreIgnoredAndALongReasonIsCut() {
+    void unknownRepeatedOrMalformedIdsAreIgnoredAndALongReasonOrDishIsCut() {
         googleFinds(2);
         String longReason = "x".repeat(200);
         when(llm.chat(anyList(), anyList())).thenReturn(toolCall("{\"query\":\"pizza\"}"),
                 answer("Voici : {\"picks\":[{\"id\":\"r9\"},{\"id\":\"p1\"},{\"id\":\"r2\",\"reason\":\"" + longReason
-                        + "\"},{\"id\":\"r2\",\"reason\":\"again\"}]}"));
+                        + "\",\"dish\":\"" + longReason + "\"},{\"id\":\"r2\",\"reason\":\"again\"}]}"));
 
         SearchResult result = search("pizza");
 
         assertThat(names(result)).containsExactly("Resto 2", "Resto 1");
         assertThat(result.deck().getFirst().reason()).hasSize(120);
+        assertThat(result.deck().getFirst().signatureDish()).hasSize(120);
     }
 
     @Test

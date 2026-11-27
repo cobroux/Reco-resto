@@ -42,8 +42,8 @@ import tools.jackson.databind.json.JsonMapper;
  * <li>The backend runs the tool: Google Text Search around the browser position (the model never gives a place),
  * then the strict filters (open, radius, diets, status, one per chain), and gives back compact candidates with short
  * ids ({@code r1}, {@code r2}...).</li>
- * <li>The model picks and ranks candidates by id, with a short reason; the backend builds the cards from the Google
- * data, so no restaurant can be invented.</li>
+ * <li>The model picks and ranks candidates by id, with a short reason and a dish to try; the backend builds the
+ * cards from the Google data, so no restaurant can be invented.</li>
  * </ol>
  * At most {@code search.tool.max-rounds} model requests and {@code search.tool.max-tool-calls} searches. A model
  * that answers without searching did not take the sentence for a restaurant request: {@code NOT_UNDERSTOOD}. Any
@@ -86,11 +86,13 @@ public class SearchService {
             Step 2. If the tool finds no candidate, you may call it ONE more time with a broader search (simpler query,
             no price, larger radius).
             Step 3. Answer with one JSON object only, no other text:
-            {"picks":[{"id":"r3","reason":"..."}]}
+            {"picks":[{"id":"r3","reason":"...","dish":"..."}]}
             - Rank at least 10 candidates (all of them when there are fewer), the best match for the sentence first.
               Only ids given by the tool. Leave out only a candidate that clearly does not match the sentence.
             - reason: one short French sentence (at most 12 words) saying why this place matches the request,
-              based only on the data given by the tool.""";
+              based only on the data given by the tool.
+            - dish: the name of one dish to try at this place (at most 5 words, in French), typical of its cuisine
+              and matching the request when it names a dish or a food.""";
 
     private static final List<Object> TOOLS = List.of(Map.of("type", "function", "function", Map.of(
             "name", TOOL_NAME,
@@ -110,6 +112,10 @@ public class SearchService {
                             "diets", Map.of("type", "array", "items", Map.of("type", "string", "enum",
                                     sorted(DIETS)))),
                     "required", List.of("query")))));
+
+    /** One pick of the model: the candidate index, then its reason and dish, {@code null} when not given. */
+    private record Pick(int index, String reason, String dish) {
+    }
 
     /** One run of the tool: what was searched, and the candidates in backend order. */
     private record ToolRun(SearchCriteria criteria, List<Restaurant> candidates, List<Restaurant> zone,
@@ -298,8 +304,8 @@ public class SearchService {
         return mapper.writeValueAsString(Map.of("count", candidates.size(), "candidates", candidates));
     }
 
-    /** The model's picks as candidate indexes with their reason, in the model's order; unknown ids are ignored. */
-    private List<Map.Entry<Integer, String>> picks(String content, ToolRun run) {
+    /** The model's picks, in the model's order; unknown ids are ignored. */
+    private List<Pick> picks(String content, ToolRun run) {
         log.debug("Agent final answer: {}", content);
         JsonNode answer = JsonAnswers.firstObject(mapper, content).orElse(null);
         if (answer == null || !answer.path("picks").isArray()) {
@@ -307,7 +313,7 @@ public class SearchService {
             return List.of();
         }
         Set<Integer> seen = new LinkedHashSet<>();
-        List<Map.Entry<Integer, String>> picks = new ArrayList<>();
+        List<Pick> picks = new ArrayList<>();
         for (JsonNode pick : answer.path("picks")) {
             String id = text(pick.path("id"));
             if (id == null || !id.matches("r\\d{1,3}")) {
@@ -317,28 +323,34 @@ public class SearchService {
             if (index < 0 || index >= run.candidates().size() || !seen.add(index)) {
                 continue;
             }
-            String reason = text(pick.path("reason"));
-            if (reason != null && reason.length() > limits.maxReasonLength()) {
-                reason = reason.substring(0, limits.maxReasonLength());
-            }
-            picks.add(Map.entry(index, reason == null ? "" : reason));
+            picks.add(new Pick(index, shortText(pick.path("reason")), shortText(pick.path("dish"))));
         }
         log.info("Agent picks: {} of {} candidates", picks.size(), run.candidates().size());
         return picks;
     }
 
-    private SearchResult result(ToolRun run, List<Map.Entry<Integer, String>> picks, boolean includeZone) {
-        // The model's picks first, with their reason; then the other valid candidates in backend order, so that the
-        // deck is full whatever the number of picks.
+    /** A text of the model cut to the longest card text, {@code null} when absent or blank. */
+    private String shortText(JsonNode node) {
+        String value = text(node);
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.length() > limits.maxReasonLength() ? value.substring(0, limits.maxReasonLength()) : value;
+    }
+
+    private SearchResult result(ToolRun run, List<Pick> picks, boolean includeZone) {
+        // The model's picks first, with their reason and dish; then the other valid candidates in backend order, so
+        // that the deck is full whatever the number of picks.
         List<Restaurant> deck = new ArrayList<>();
         Set<Integer> used = new LinkedHashSet<>();
-        for (Map.Entry<Integer, String> pick : picks) {
+        for (Pick pick : picks) {
             if (deck.size() >= properties.deckSize()) {
                 break;
             }
-            Restaurant restaurant = run.candidates().get(pick.getKey());
-            deck.add(pick.getValue().isBlank() ? restaurant : restaurant.withReason(pick.getValue()));
-            used.add(pick.getKey());
+            Restaurant restaurant = run.candidates().get(pick.index());
+            deck.add(restaurant.withSuggestion(pick.reason(),
+                    pick.dish() == null ? restaurant.signatureDish() : pick.dish()));
+            used.add(pick.index());
         }
         for (int i = 0; i < run.candidates().size() && deck.size() < properties.deckSize(); i++) {
             if (!used.contains(i)) {

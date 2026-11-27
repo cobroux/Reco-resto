@@ -43,9 +43,14 @@
       (toggleDetail)="toggleDetail(item.id)"
     >
       @if (decided()) {
-        <a class="primary-btn" data-testid="itinerary" [routerLink]="['/route', item.id]">{{
-          results.itinerary
-        }}</a>
+        <a
+          class="primary-btn"
+          data-testid="itinerary"
+          [href]="mapsUrl(item.restaurant)"
+          target="_blank"
+          rel="noopener noreferrer"
+          >{{ results.itinerary }}</a
+        >
         <button type="button" class="soft-btn" data-testid="change-mind" (click)="like(item.id)">
           {{ results.changeMind }}
         </button>
