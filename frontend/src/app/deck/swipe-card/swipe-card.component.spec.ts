@@ -522,6 +522,59 @@ describe('SwipeCardComponent', () => {
     });
   });
 
+  describe('text that does not fit (small phones)', () => {
+    type Callback = () => void;
+    let observed: Callback[];
+    const original = globalThis.ResizeObserver;
+
+    beforeEach(() => {
+      observed = [];
+      globalThis.ResizeObserver = class {
+        constructor(private readonly callback: Callback) {
+          observed.push(callback);
+        }
+        observe(): void {}
+        disconnect(): void {}
+      } as unknown as typeof ResizeObserver;
+    });
+
+    afterEach(() => {
+      globalThis.ResizeObserver = original;
+    });
+
+    const body = () => root.querySelector('.body') as HTMLElement;
+
+    async function resize(scrollHeight: number, clientHeight: number): Promise<void> {
+      Object.defineProperty(body(), 'scrollHeight', { configurable: true, value: scrollHeight });
+      Object.defineProperty(body(), 'clientHeight', { configurable: true, value: clientHeight });
+      observed.forEach((callback) => callback());
+      await fixture.whenStable();
+    }
+
+    it('scrolls only when the text overflows the card', async () => {
+      await create(FULL);
+
+      await resize(300, 200);
+      expect(body().classList).toContain('scrollable');
+
+      await resize(200, 200);
+      expect(body().classList).not.toContain('scrollable');
+    });
+
+    it('keeps the swipe up everywhere while the text fits', async () => {
+      await create(FULL);
+      await resize(200, 200);
+
+      body().dispatchEvent(pointer('pointerdown', 100, 100));
+      body().dispatchEvent(pointer('pointermove', 100, -100));
+      await fixture.whenStable();
+      body().dispatchEvent(pointer('pointerup', 100, -100));
+      await fixture.whenStable();
+
+      expect(swipes).toEqual(['up']);
+    });
+  });
+
   describe('back of the card (spec 004)', () => {
     const WITH_DETAILS: Restaurant = {
       ...FULL,

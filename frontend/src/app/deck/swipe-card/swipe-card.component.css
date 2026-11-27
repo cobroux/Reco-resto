@@ -520,13 +520,40 @@
   min-height: 120px;
 }
 
+/* Once the photo is at its minimum height, the text shrinks instead of being cut by the card. It scrolls
+   (vertical finger moves included) only while it overflows (.scrollable, set by the component), so a
+   swipe up on the text stays "On y va" whenever it fits. */
 .body {
-  flex: none;
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: hidden;
   padding: 16px 20px 20px;
+}
+
+/* The text overflows instead of being squeezed (the clamped name and reason would shrink to nothing). */
+.body > * {
+  flex-shrink: 0;
+}
+
+.body.scrollable {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
 .name {
   font-size: 22px;
+}
+
+/* The name and the reason are cut after two lines ("…") so the chips and the tiles stay visible on
+   small phones (the card never grows past the screen). The back of the card shows the full name. */
+.name,
+.reason {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 
 .stamp-label {

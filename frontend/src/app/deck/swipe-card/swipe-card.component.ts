@@ -2,12 +2,15 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
   InjectionToken,
   computed,
+  effect,
   inject,
   input,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { EnrichedPhoto } from '../../enrichment/card-enrichment';
 import { Restaurant } from '../../restaurant/restaurant';
@@ -115,8 +118,29 @@ export class SwipeCardComponent {
       : '',
   );
 
+  /** Text part of the front; it scrolls only when it does not fit the card (small phones). */
+  private readonly body = viewChild<ElementRef<HTMLElement>>('body');
+  /**
+   * True while the text overflows the card. Only then does it scroll under the finger (touch-action: pan-y), so a
+   * swipe up on the text stays "On y va" whenever the text fits.
+   */
+  protected readonly bodyScrolls = signal(false);
+
   constructor() {
     inject(DestroyRef).onDestroy(() => clearTimeout(this.leaveTimer));
+    effect((onCleanup) => {
+      const element = this.body()?.nativeElement;
+      if (!element || typeof ResizeObserver === 'undefined') {
+        this.bodyScrolls.set(false);
+        return;
+      }
+      const observer = new ResizeObserver(() =>
+        this.bodyScrolls.set(element.scrollHeight > element.clientHeight),
+      );
+      observer.observe(element);
+      Array.from(element.children).forEach((child) => observer.observe(child));
+      onCleanup(() => observer.disconnect());
+    });
   }
 
   /** Flies the card off in a direction, as for a swipe (used by the reaction buttons). */

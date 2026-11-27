@@ -337,6 +337,11 @@
     font-size: 16px;
   }
 
+  /* The desktop rule aligns the search to the start of its grid cell; on mobile it takes the full width. */
+  .search {
+    align-self: stretch;
+  }
+
   .search-form {
     max-width: none;
     flex-direction: column;

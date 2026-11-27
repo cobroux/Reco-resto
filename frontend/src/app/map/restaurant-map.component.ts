@@ -22,7 +22,22 @@ import { WalkingRoute, WalkingRouteService } from './walking-route.service';
 
 /** Zoom used when only the restaurant is known (no position of the user). */
 const SINGLE_POINT_ZOOM = 16;
-const FIT_PADDING = 48;
+/** Bottom of the zoom buttons, top right of the map (10 px margin + two 40 px buttons, restaurant-map.component.css). */
+const ZOOM_CONTROLS_BOTTOM = 90;
+/** Height of the name label drawn above the restaurant marker (.restaurant-name: 26 px offset + ~37 px pill). */
+const NAME_LABEL_HEIGHT = 64;
+/** Half of the widest name label (.restaurant-name max-width: 180 px), plus a 6 px margin. */
+const NAME_LABEL_HALF_WIDTH = 96;
+/**
+ * The points are framed so that the name label, centred above the restaurant marker, stays inside the map and
+ * below the zoom buttons, whatever the direction of the route.
+ */
+const FIT_PADDING = {
+  top: ZOOM_CONTROLS_BOTTOM + NAME_LABEL_HEIGHT + 6,
+  right: NAME_LABEL_HALF_WIDTH,
+  bottom: 48,
+  left: NAME_LABEL_HALF_WIDTH,
+};
 const FIT_MAX_ZOOM = 17;
 
 const toLngLat = (position: Position): [number, number] => [position.longitude, position.latitude];

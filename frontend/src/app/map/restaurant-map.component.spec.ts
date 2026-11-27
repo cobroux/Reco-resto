@@ -250,6 +250,15 @@ describe('RestaurantMapComponent', () => {
       expect(mapCalls.fitBounds.length).toBe(1);
     });
 
+    it('leaves room above the points for the name label, so it stays inside the map', async () => {
+      await create();
+
+      const options = mapCalls.fitBounds[0][1] as {
+        padding: { top: number; right: number; bottom: number; left: number };
+      };
+      expect(options.padding.top).toBeGreaterThan(options.padding.bottom);
+    });
+
     it('does not move on a pure redraw (name change)', async () => {
       const { fixture } = await create();
       mapCalls.fitBounds = [];
