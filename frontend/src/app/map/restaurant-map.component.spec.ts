@@ -197,6 +197,45 @@ describe('RestaurantMapComponent', () => {
     expect(mapCalls.removedMaps).toBe(1);
   });
 
+  describe('camera', () => {
+    it('fits the view once at start', async () => {
+      await create();
+
+      expect(mapCalls.fitBounds.length).toBe(1);
+    });
+
+    it('does not move on a pure redraw (name change)', async () => {
+      const { fixture } = await create();
+      mapCalls.fitBounds = [];
+
+      fixture.componentInstance.name.set('Another name');
+      await fixture.whenStable();
+
+      expect(mapCalls.fitBounds).toEqual([]);
+      expect(mapCalls.easeTo).toEqual([]);
+    });
+
+    it('does not move when no route is found', async () => {
+      const { fixture } = await create();
+      mapCalls.fitBounds = [];
+
+      routeAnswer.next(null);
+      await fixture.whenStable();
+
+      expect(mapCalls.fitBounds).toEqual([]);
+    });
+
+    it('fits again when the restaurant changes', async () => {
+      const { fixture } = await create();
+      mapCalls.fitBounds = [];
+
+      fixture.componentInstance.restaurant.set({ latitude: 48.86, longitude: 2.35 });
+      await fixture.whenStable();
+
+      expect(mapCalls.fitBounds.length).toBeGreaterThan(0);
+    });
+  });
+
   describe('recenter button', () => {
     it('is labelled', async () => {
       const { root } = await create();

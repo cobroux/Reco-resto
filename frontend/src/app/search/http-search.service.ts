@@ -79,11 +79,12 @@ export class HttpSearchService extends SearchService {
       .distances(user, located.map((restaurant) => restaurant.location!))
       .pipe(
         map((distances) => {
-          const walking = new Map(located.map((restaurant, i) => [restaurant.id, distances[i]]));
+          // Keyed by the restaurant itself, not by its id: two restaurants can share an id (fallback id name|address).
+          const walking = new Map(located.map((restaurant, i) => [restaurant, distances[i]]));
           return {
             ...input,
             restaurants: input.restaurants.map((restaurant) => {
-              const meters = walking.get(restaurant.id);
+              const meters = walking.get(restaurant);
               return meters == null ? restaurant : { ...restaurant, distanceMeters: meters };
             }),
           };

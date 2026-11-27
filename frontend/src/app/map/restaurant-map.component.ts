@@ -10,6 +10,7 @@ import {
   inject,
   input,
   signal,
+  untracked,
 } from '@angular/core';
 import type maplibregl from 'maplibre-gl';
 import { RESULTS_TEXTS } from '../deck/deck.texts';
@@ -71,6 +72,8 @@ export class RestaurantMapComponent {
   private readonly routes = inject(WalkingRouteService);
   /** Walking route from the user to the restaurant; null while it is computed or when it is unavailable. */
   private readonly route = signal<WalkingRoute | null>(null);
+  /** Framing input: flips once when the route first arrives (and back when it is reset), not on every redraw. */
+  private readonly hasRoute = computed(() => this.route() !== null);
   /** "5 min à pied · 350 m" once the route is known, else the caption given by the parent. */
   protected readonly shownCaption = computed(() => {
     const route = this.route();
@@ -108,6 +111,18 @@ export class RestaurantMapComponent {
       this.route();
       this.draw();
     });
+    // The camera only moves when the framing inputs change: the restaurant, the user, or the first arrival of the
+    // route. A redraw alone (e.g. the name) never moves it, so it does not undo a pan or a zoom of the user.
+    effect(() => {
+      this.restaurant();
+      this.user();
+      this.hasRoute();
+      untracked(() => {
+        if (this.ready) {
+          this.recenter();
+        }
+      });
+    });
     inject(DestroyRef).onDestroy(() => {
       this.destroyed = true;
       this.markers.forEach((marker) => marker.remove());
@@ -134,6 +149,7 @@ export class RestaurantMapComponent {
       this.collapseAttribution();
       this.ready = true;
       this.draw();
+      this.recenter();
     });
   }
 
@@ -162,7 +178,6 @@ export class RestaurantMapComponent {
         ? [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: this.path(user, restaurant) } }]
         : [],
     });
-    this.recenter();
   }
 
   /** The walking route when known, else a straight line (fallback while it is computed or unavailable). */

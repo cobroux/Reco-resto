@@ -182,6 +182,26 @@ describe('HttpSearchService', () => {
       ]);
     });
 
+    it('gives each restaurant its own walking distance even when two share an id', async () => {
+      granted();
+      const next = vi.fn();
+      service.search(SENTENCE).subscribe({ next });
+      const twins = {
+        ...RESULT,
+        deck: [
+          { name: 'Twin', address: '1 rue A', distanceMeters: 100, location: { latitude: 48.86, longitude: 2.34 } },
+          { name: 'Twin', address: '1 rue A', distanceMeters: 300, location: { latitude: 48.85, longitude: 2.35 } },
+        ],
+      };
+
+      (await vi.waitFor(() => http.expectOne('/api/search'))).flush(twins);
+      (await tableRequest()).flush({ code: 'Ok', distances: [[0, 120.4, 410.7]] });
+
+      expect(next.mock.calls[0][0].restaurants.map((r: { distanceMeters: number }) => r.distanceMeters)).toEqual([
+        120.4, 410.7,
+      ]);
+    });
+
     it('keeps the distances of the backend when the routing service fails', async () => {
       granted();
       const next = vi.fn();
