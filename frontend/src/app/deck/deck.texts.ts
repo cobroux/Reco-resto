@@ -1,0 +1,67 @@
+/** Single source of every French text of the swipe deck and its placeholder screens. */
+export const DECK_TEXTS = {
+  logo: 'Nappe',
+  title: (moment: string | null) => `Ça vous dit, ${moment ?? 'maintenant'} ?`,
+  progress: (position: number, size: number) => `${position} sur ${size}`,
+  seeList: 'Voir la liste',
+  dislike: 'Pas miam',
+  like: 'Miam',
+  pick: 'On y va',
+  rewind: 'Revenir à la carte précédente',
+  toTaste: 'À goûter',
+  open: 'Ouvert',
+  until: (time: string) => `jusqu'à ${time}`,
+  openUntil: (time: string) => `${DECK_TEXTS.open} ${DECK_TEXTS.until(time)}`,
+  degraded: 'Suggestions non personnalisées pour le moment',
+  cooking: 'En cuisine…',
+  backToDeck: 'Retour aux propositions',
+  /** Google attribution (spec 008, FR-014, D15): never translated (Google Maps Platform terms). */
+  googleMaps: 'Google Maps',
+  /** Accessible name of the website link icon (spec 007, FR-007, PO-14). */
+  website: 'Site du restaurant',
+  /** Unsplash credit "Photo : <photographer> / Unsplash" (spec 007, FR-015). */
+  photoBy: 'Photo :',
+  unsplash: 'Unsplash',
+  backToHome: "Retour à l'accueil",
+  // Back of the card (spec 004); wording of the labels is a proposal to validate (plan D-04-2, D-04-11, D-04-12).
+  flip: 'Retourner la carte',
+  hours: 'Horaires',
+  closed: 'Fermé',
+  addressTitle: 'Adresse',
+  phone: 'Téléphone',
+  detail: 'Détail',
+  hideDetail: 'Masquer le détail',
+  route: 'Itinéraire',
+  menu: 'Menu',
+  fullRoute: "Voir l'itinéraire complet",
+  routeLoading: "Calcul de l'itinéraire…",
+  routeUnavailable: "L'itinéraire n'est pas disponible pour le moment",
+  travelModes: {
+    walk: 'À pied',
+    bike: 'À vélo',
+    car: 'En voiture',
+    transit: 'Transports',
+  },
+} as const;
+
+/** Texts of the results screen (wording from the Claude Design mockup "Web 2c · Résultats"). */
+export const RESULTS_TEXTS = {
+  title: (count: number, moment: string | null) =>
+    `Vos ${count} coup${count > 1 ? 's' : ''} de cœur${moment ? ` ${moment}` : ''}`,
+  decided: (name: string) => `C’est décidé : ${name} !`,
+  emptyTitle: 'Aucun coup de cœur… pour l’instant',
+  emptySubtitle: 'Aucun « Miam » cette fois-ci.',
+  chooseSubtitle: 'Choisissez celui où vous allez, d’après vos « Miam ».',
+  decidedSubtitle: 'Bon appétit ! Vos autres « Miam » restent sous la main.',
+  suggestion: 'Notre suggestion',
+  itinerary: 'Itinéraire',
+  changeMind: 'Changer d’avis',
+  othersChoosing: 'Aussi dans vos « Miam »',
+  othersDecided: 'Vos autres « Miam »',
+  distance: 'Distance',
+  nopeSection: (count: number) => `${DECK_TEXTS.dislike} · ${count}`,
+  revive: 'Finalement, miam',
+  emptyCardTitle: 'Rien ne vous a tenté ?',
+  emptyCardBody: 'Pas de souci : refaites un tour avec d’autres propositions.',
+  redo: 'Refaire un tour',
+} as const;

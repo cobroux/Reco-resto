@@ -1,0 +1,137 @@
+search:
+  default-radius-km: 2.5
+  deck-size: 15
+  # Every travel time is on foot; speed used to turn minutes into meters (value chosen by the team).
+  walking-speed-kmh: 5
+  # Limits of the tool-calling search (product owner, 2026-11-26).
+  tool:
+    # Radius the model may ask for, in meters.
+    min-radius-meters: 300
+    max-radius-meters: 5000
+    # Longest text sent to Google Text Search, and longest reason shown on a card, in characters.
+    max-query-length: 100
+    max-reason-length: 120
+    # Candidates shown to the model (never fewer than the deck size).
+    max-candidates: 20
+    # Model requests of one search, and searches the model may run.
+    max-rounds: 3
+    max-tool-calls: 2
+  # Spec 008, amendment "chains" (product owner, 2026-11-26): the deck (not the zone list) keeps at most one
+  # restaurant per chain, the nearest one. Two restaurants are the same chain when they share the website host, the
+  # normalized name, or a known chain name below.
+  chains:
+    # PROPOSED list, to be confirmed by the product owner. A restaurant whose normalized name (lower case, no accents,
+    # no punctuation, part after " - ", " | " or "(" dropped) starts with one of these normalized names, as whole
+    # words, belongs to that chain ("Paul Gare de Lyon" is Paul, "Paulette" is not).
+    known-names:
+      - McDonald's
+      - Burger King
+      - KFC
+      - Quick
+      - Subway
+      - Five Guys
+      - O'Tacos
+      - Chipotle
+      - Domino's
+      - Pizza Hut
+      - Starbucks
+      - Columbus Café
+      - Paul
+      - Pret A Manger
+      - Big Mamma
+      - Bagelstein
+      - Exki
+      - Cojean
+      - Léon de Bruxelles
+      - Hippopotamus
+      - Buffalo Grill
+      - Courtepaille
+      - Del Arte
+      - Flunch
+      - Pitaya
+      - Sushi Shop
+      - Planet Sushi
+      - Bert's
+      - Big Fernand
+      - Bioburger
+      - Black & White Burger
+      - Popeyes
+      - Taco Bell
+      - Wendy's
+      - Côté Sushi
+      - Memphis Coffee
+      - Brioche Dorée
+    # Website hosts shared by unrelated businesses: they never group restaurants (the name rules still apply). An
+    # entry matches the host and its subdomains ("facebook.com" also matches "fr-fr.facebook.com"); "x.*" matches any
+    # ending ("tripadvisor.*": tripadvisor.fr, tripadvisor.com...). Website builders with one subdomain per site
+    # (wixsite.com, wixstudio.com) are NOT listed: their full host ("chezlulu.wixsite.com") is per site.
+    generic-hosts:
+      - facebook.com
+      - instagram.com
+      - linktr.ee
+      - google.com
+      - tripadvisor.*
+      - thefork.*
+      - lafourchette.*
+      - ubereats.com
+      - deliveroo.*
+
+llm:
+  base-url: ${LLM_BASE_URL:}
+  api-key: ${LLM_API_KEY:}
+  model: ${LLM_MODEL:nova-lite}
+  # Largest answer asked for: the endpoint cuts at 2000 tokens by default, the model accepts up to 10000.
+  max-tokens: ${LLM_MAX_TOKENS:10000}
+  # Sampling temperature: 0 gives the same reading of the same sentence (product owner, 2026-11-26).
+  temperature: ${LLM_TEMPERATURE:0}
+
+# Google Places API (New), spec 008. Each value can be overridden by the GOOGLE_PLACES_* variable of the same name;
+# decisions: specs/008-google-places-source/plan.md "Product owner decisions (2026-11-25)".
+google-places:
+  # Documented endpoint of the Places API (New) (research R1).
+  base-url: ${GOOGLE_PLACES_BASE_URL:https://places.googleapis.com/v1}
+  # Server only, never committed with a value; no default value (FR-013).
+  api-key: ${GOOGLE_PLACES_API_KEY:}
+  # D1: Google is "not answering" after 10 s.
+  timeout-seconds: ${GOOGLE_PLACES_TIMEOUT_SECONDS:10}
+  # D2: one new attempt after 1 s on a Google server error, 429 or timeout; empty means a single attempt.
+  retry-delays-seconds: ${GOOGLE_PLACES_RETRY_DELAYS_SECONDS:1}
+  # D3: at most 20 places per search point (one page of Text Search since the 2026-11-26 experiment), no pagination.
+  max-results: ${GOOGLE_PLACES_MAX_RESULTS:20}
+  # D16: width of the photos fetched by the backend photo endpoint.
+  photo-max-width-px: ${GOOGLE_PLACES_PHOTO_MAX_WIDTH_PX:800}
+  # Technical (plan): the product is French and France-only.
+  language-code: fr
+  region-code: FR
+  # Development only: a Google answer read from this file instead of calling Google (data NOT real).
+  fixture-file: ${GOOGLE_PLACES_FIXTURE_FILE:}
+
+# Card website enrichment, spec 007. Each value can be overridden by the CARD_ENRICHMENT_* variable of the same name;
+# decisions: specs/007-card-website-enrichment/plan.md "Product owner decisions (2026-11-26)".
+card-enrichment:
+  # FR-011, PO-4 (a): an enrichment is abandoned 5 s after the backend received the request.
+  budget-seconds: ${CARD_ENRICHMENT_BUDGET_SECONDS:5}
+  # PO-1: at most 1 MiB of a page is read; a longer page is cut and parsed.
+  max-page-bytes: ${CARD_ENRICHMENT_MAX_PAGE_BYTES:1048576}
+  # PO-3, FR-004 step 1: images declared under 100 px wide or high are not candidates.
+  min-image-size-px: ${CARD_ENRICHMENT_MIN_IMAGE_SIZE_PX:100}
+  # PO-7: at most 5 redirects followed.
+  max-redirects: ${CARD_ENRICHMENT_MAX_REDIRECTS:5}
+  # PO-8: websites and images on ports 80 and 443 only.
+  allowed-ports: ${CARD_ENRICHMENT_ALLOWED_PORTS:80,443}
+  # PO-6, OQ-2: honest name of the project; robots.txt is not read.
+  user-agent: ${CARD_ENRICHMENT_USER_AGENT:RecoResto/0.1 (proof of concept)}
+  # PO-10 (2): 8 enrichments at the same time; the others wait, and the wait counts in the budget.
+  executor-size: ${CARD_ENRICHMENT_EXECUTOR_SIZE:8}
+  # Amendment (b): Unsplash cuisine photo when the website gives no displayable photo (plan "Amendment (b) (Unsplash)").
+  unsplash:
+    # Documented endpoint of the Unsplash API (research R14).
+    base-url: ${CARD_ENRICHMENT_UNSPLASH_BASE_URL:https://api.unsplash.com}
+    # Server only, never committed with a value; no default value; blank = no Unsplash request (FR-014, T36).
+    access-key: ${UNSPLASH_ACCESS_KEY:}
+    # FR-015: utm_source of the credit links.
+    app-name: ${CARD_ENRICHMENT_UNSPLASH_APP_NAME:reco_resto}
+    # FR-013: the photo is chosen among the first 15 results.
+    per-page: ${CARD_ENRICHMENT_UNSPLASH_PER_PAGE:15}
+    # FR-016: the answer of one query is reused for 1 hour (memory only).
+    cache-ttl: ${CARD_ENRICHMENT_UNSPLASH_CACHE_TTL:1h}

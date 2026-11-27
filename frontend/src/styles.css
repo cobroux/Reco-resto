@@ -1,1 +1,33 @@
-/* You can add global styles to this file, and also import other style files */
+/* Global reset and design tokens (values from the Claude Design mockup). */
+:root {
+  --color-page: #f5f3fc;
+  --color-panel: #e9e5fd;
+  --color-primary: #5b4bc4;
+  --color-text: #23202e;
+  --color-muted: #4e4960;
+  --color-placeholder: #6a6578;
+  --color-white: #ffffff;
+  --font-sans: 'Outfit', system-ui, sans-serif;
+  /* Gingham of the Nappe logo, single source for the logo, the missing-photo visual (D16, swipe card),
+     the tablecloth (D20) and the logo of the results screen. Tile size is set by each user with background-size. */
+  --nappe-gingham:
+    linear-gradient(90deg, rgba(91, 75, 196, 0.55) 50%, transparent 50%),
+    linear-gradient(0deg, rgba(91, 75, 196, 0.55) 50%, transparent 50%);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-page);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
+
+input::placeholder {
+  color: var(--color-placeholder);
+}

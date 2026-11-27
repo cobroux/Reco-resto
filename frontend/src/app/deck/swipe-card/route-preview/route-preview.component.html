@@ -1,0 +1,21 @@
+<div class="preview" data-testid="route-preview">
+  @switch (status()) {
+    @case ('loading') {
+      <p class="note" role="status">{{ texts.routeLoading }}</p>
+    }
+    @case ('failed') {
+      <p class="note" role="status">{{ texts.routeUnavailable }}</p>
+    }
+    @default {
+      <ul class="modes">
+        @for (item of preview().modes; track item.mode) {
+          <li class="mode">
+            <span>{{ texts.travelModes[item.mode] }}</span>
+            <span class="minutes">{{ item.minutes }} min</span>
+          </li>
+        }
+      </ul>
+    }
+  }
+  <a class="full-route" [routerLink]="['/route', restaurant().id]">{{ texts.fullRoute }}</a>
+</div>

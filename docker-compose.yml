@@ -1,0 +1,37 @@
+# Runs on the EC2 instance. Deployed by .github/workflows/deploy.yml.
+# IMAGE_PREFIX and IMAGE_TAG are provided by the deploy workflow.
+services:
+  backend:
+    image: ${IMAGE_PREFIX}-backend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    # ~/.env is written by the deploy workflow from GitHub secrets/variables.
+    env_file: .env
+    environment:
+      # The instance has 1 GiB of RAM: cap the JVM heap.
+      JAVA_TOOL_OPTIONS: -Xmx384m
+    # No published port: only the frontend (nginx) reaches the backend.
+
+  frontend:
+    image: ${IMAGE_PREFIX}-frontend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    # No published port: only Caddy (HTTPS termination) reaches nginx.
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    # Gets and renews the Let's Encrypt certificate for the DuckDNS name by itself.
+    # The name must resolve to the instance's public IP (ports 80 and 443 open).
+    command: caddy reverse-proxy --from reco-resto.duckdns.org --to frontend:80
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Keeps the certificate across restarts (Let's Encrypt rate limits).
+      - caddy_data:/data
+
+volumes:
+  caddy_data:

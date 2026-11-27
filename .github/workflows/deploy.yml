@@ -1,0 +1,86 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  # Lowercase owner: registry paths must be lowercase.
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/reco-resto
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # The EC2 instance is ARM64 (Graviton).
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.app }}
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.app }}:${{ github.sha }}
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.app }}:latest
+          cache-from: type=gha,scope=${{ matrix.app }}-arm64
+          cache-to: type=gha,scope=${{ matrix.app }}-arm64,mode=max
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Copy the compose file
+        run: scp docker-compose.yml "${{ vars.EC2_USER }}@${{ secrets.EC2_HOST }}:~/docker-compose.yml"
+
+      - name: Write the .env file
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+          GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+        run: |
+          printf 'LLM_BASE_URL=%s\nLLM_API_KEY=%s\nLLM_MODEL=%s\nGOOGLE_PLACES_API_KEY=%s\nUNSPLASH_ACCESS_KEY=%s\n' \
+            "$LLM_BASE_URL" "$LLM_API_KEY" "$LLM_MODEL" "$GOOGLE_PLACES_API_KEY" "$UNSPLASH_ACCESS_KEY" \
+            | ssh "${{ vars.EC2_USER }}@${{ secrets.EC2_HOST }}" 'umask 077 && cat > ~/.env'
+
+      - name: Pull and restart the containers
+        run: |
+          ssh "${{ vars.EC2_USER }}@${{ secrets.EC2_HOST }}" \
+            "IMAGE_PREFIX=${{ env.IMAGE_PREFIX }} IMAGE_TAG=${{ github.sha }} docker compose -f ~/docker-compose.yml pull && \
+             IMAGE_PREFIX=${{ env.IMAGE_PREFIX }} IMAGE_TAG=${{ github.sha }} docker compose -f ~/docker-compose.yml up -d --remove-orphans"
+
+      - name: Smoke test
+        run: |
+          for i in $(seq 1 12); do
+            curl -fsS "https://reco-resto.duckdns.org/api/hello" && exit 0
+            sleep 10
+          done
+          exit 1

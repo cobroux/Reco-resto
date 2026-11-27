@@ -1,0 +1,233 @@
+<article
+  class="card"
+  [class.dragging]="transform() !== '' && !isLeaving()"
+  [class.leaving]="isLeaving()"
+  [class.flipped]="flipped()"
+  [style.transform]="transform()"
+  [style.transition]="transition()"
+  [attr.aria-label]="restaurant().name"
+  (pointerdown)="onPointerDown($event)"
+  (pointermove)="onPointerMove($event)"
+  (pointerup)="onPointerUp($event)"
+  (pointercancel)="onPointerCancel()"
+>
+  @if (flipped()) {
+    <div class="back" data-testid="back">
+      <header class="back-head">
+        <div class="back-title">
+          <h2 class="back-name">{{ restaurant().name }}</h2>
+          <p class="back-meta">
+            {{ restaurant().cuisine }} · {{ distance() }}
+            @if (restaurant().priceLevel; as price) {
+              · {{ price }}
+            }
+          </p>
+        </div>
+        <button type="button" class="flip-btn" [attr.aria-label]="texts.flip" (click)="flip()">
+          <span aria-hidden="true">↻</span>
+        </button>
+      </header>
+
+      @if (restaurant().keywords.length) {
+        <ul class="back-tags">
+          @for (keyword of restaurant().keywords; track keyword) {
+            <li class="back-tag">{{ keyword }}</li>
+          }
+        </ul>
+      }
+
+      @if (hoursRows().length) {
+        <section class="section" data-testid="hours">
+          <h3 class="section-title">{{ texts.hours }}</h3>
+          @for (row of hoursRows(); track row.day) {
+            <div class="hours-row" [class.targeted]="row.targeted">
+              <span>{{ row.day }}</span>
+              <span>{{ row.ranges }}</span>
+            </div>
+          }
+        </section>
+      }
+
+      @if (restaurant().address; as address) {
+        <section class="section" data-testid="back-address">
+          <h3 class="section-title">{{ texts.addressTitle }}</h3>
+          <p class="back-address">{{ address }}</p>
+          <button
+            type="button"
+            class="route-btn"
+            [attr.aria-expanded]="previewOpen()"
+            (click)="openRoute()"
+          >
+            {{ texts.route }}
+          </button>
+          @if (previewOpen()) {
+            <app-route-preview [restaurant]="restaurant()" />
+          }
+        </section>
+      }
+
+      @if (restaurant().menu?.length) {
+        <section class="section" data-testid="menu">
+          <h3 class="section-title">{{ texts.menu }}</h3>
+          @for (dish of restaurant().menu; track $index) {
+            <div class="dish">
+              <div class="dish-text">
+                <span class="dish-title">{{ dish.name }}</span>
+                @if (dish.description) {
+                  <span class="dish-desc">{{ dish.description }}</span>
+                }
+              </div>
+              @if (dish.price) {
+                <span class="dish-price">{{ dish.price }}</span>
+              }
+            </div>
+          }
+        </section>
+      }
+    </div>
+  } @else {
+    <div class="hero">
+      @if (photo(); as photo) {
+        <img
+          class="photo"
+          [src]="photo"
+          alt=""
+          draggable="false"
+          referrerpolicy="no-referrer"
+          (error)="onPhotoError(photo)"
+        />
+      } @else {
+        <div class="tablecloth" data-testid="tablecloth" aria-hidden="true"></div>
+      }
+      <span class="distance">{{ distance() }}</span>
+      <!-- Spec 007, FR-007 (PO-14): website link icon at the top-left of the photo area. -->
+      @if (restaurant().website; as website) {
+        <a
+          class="website"
+          [href]="website"
+          target="_blank"
+          rel="noopener noreferrer"
+          draggable="false"
+          [attr.aria-label]="texts.website"
+          [title]="texts.website"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
+            <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+          </svg>
+        </a>
+      }
+      <!-- Spec 007, FR-015: Unsplash credit at the top-right, clear of the link, the distance and "Google Maps". -->
+      @if (credit(); as credit) {
+        <p class="credit" data-testid="unsplash-credit">
+          {{ texts.photoBy }}
+          <a
+            [href]="credit.photographerUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            draggable="false"
+            >{{ credit.photographerName }}</a
+          >
+          /
+          <a
+            [href]="credit.unsplashUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            draggable="false"
+            >{{ texts.unsplash }}</a
+          >
+        </p>
+      }
+      <!-- Spec 008, FR-014 (D15): bottom-right (left of the flip button of spec 004), so the top-left corner stays free for the website link of spec 007. -->
+      <div class="attribution" data-testid="google-attribution">
+        <span class="google-maps" data-testid="google-maps" translate="no">{{
+          texts.googleMaps
+        }}</span>
+        @if (restaurant().attributions?.length) {
+          <span class="providers" data-testid="data-providers">
+            @for (item of restaurant().attributions; track $index) {
+              @if (item.providerUri) {
+                <a [href]="item.providerUri" target="_blank" rel="noopener noreferrer">{{
+                  item.provider
+                }}</a>
+              } @else {
+                <span>{{ item.provider }}</span>
+              }
+            }
+          </span>
+        }
+        @if (restaurant().photoAttributions?.length) {
+          <span class="authors" data-testid="photo-authors">
+            @for (author of restaurant().photoAttributions; track $index) {
+              @if (author.uri) {
+                <a [href]="author.uri" target="_blank" rel="noopener noreferrer">{{
+                  author.displayName
+                }}</a>
+              } @else {
+                <span>{{ author.displayName }}</span>
+              }
+            }
+          </span>
+        }
+      </div>
+      <button
+        type="button"
+        class="flip-btn on-photo"
+        [attr.aria-label]="texts.flip"
+        (click)="flip()"
+      >
+        <span aria-hidden="true">↻</span>
+      </button>
+      <div class="stamp like" aria-hidden="true" [style.opacity]="likeOpacity()">
+        <span class="stamp-label"><span class="stamp-icon">♥</span>{{ texts.like }}</span>
+      </div>
+      <div class="stamp nope" aria-hidden="true" [style.opacity]="nopeOpacity()">
+        <span class="stamp-label"><span class="stamp-icon">✕</span>{{ texts.dislike }}</span>
+      </div>
+    </div>
+
+    <div class="body">
+      <h2 class="name">{{ restaurant().name }}</h2>
+      @if (restaurant().address; as address) {
+        <p class="address" data-testid="address">{{ address }}</p>
+      }
+      @if (restaurant().reason; as reason) {
+        <p class="reason" data-testid="reason">✨ {{ reason }}</p>
+      }
+      <ul class="chips">
+        <li class="chip cuisine">{{ restaurant().cuisine }}</li>
+        @for (keyword of restaurant().keywords; track keyword) {
+          <li class="chip keyword">{{ keyword }}</li>
+        }
+        @if (restaurant().priceLevel; as price) {
+          <li class="chip price">{{ price }}</li>
+        }
+      </ul>
+      <div class="tiles">
+        <p class="tile open">
+          @if (closingTime(); as time) {
+            <span class="tile-label">{{ texts.open }}</span>&ngsp;<span class="open-time">{{
+              texts.until(time)
+            }}</span>
+          }
+        </p>
+        <p class="tile taste">
+          <span class="tile-label">{{ texts.toTaste }}</span>
+          @if (restaurant().dish; as dish) {
+            <span class="dish-name">{{ dish.name }}</span>
+          } @else {
+            <svg
+              data-testid="default-dish"
+              class="default-dish"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="7" />
+              <circle cx="12" cy="12" r="4" />
+            </svg>
+          }
+        </p>
+      </div>
+    </div>
+  }
+</article>

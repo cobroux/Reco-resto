@@ -1,0 +1,535 @@
+/* Values from the V2WebSwipe / V2MobileSwipe mockup boards. */
+:host {
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+
+.card {
+  position: absolute;
+  inset: 0;
+  border-radius: 32px;
+  overflow: hidden;
+  background: var(--color-white);
+  box-shadow: 0 24px 60px rgba(76, 60, 160, 0.16);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  transition: transform 220ms ease;
+}
+
+.card.dragging {
+  cursor: grabbing;
+  transition: none;
+}
+
+/* D18: the next card rises from the peek position; the leaving card fades while flying off. */
+.card {
+  animation: rise 300ms ease-out;
+}
+
+.card.leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(16px) rotate(3deg) scale(0.95);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+    transition: none;
+  }
+}
+
+.hero {
+  position: relative;
+  height: 300px;
+  background: #fdebdd;
+}
+
+.photo,
+.tablecloth {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* Default visual in the style of the Nappe logo (gingham), decision D16; --nappe-gingham is
+   defined on the deck host (D20). */
+.tablecloth {
+  background-color: var(--color-white);
+  background-image: var(--nappe-gingham);
+  background-size: 28px 28px;
+}
+
+.distance {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  border-radius: 999px;
+  font-weight: 600;
+  left: 14px;
+  bottom: 14px;
+  height: 32px;
+  padding: 0 12px;
+  background: var(--color-white);
+  font-size: 13px;
+}
+
+/* Google attribution (spec 008, FR-014, D15): discreet text on the photo, bottom-right so the
+   top-left corner stays free for the website link of spec 007. "Google Maps" is 12 px, weight 400,
+   never wrapped (Google Maps Platform terms, research R6); the photo authors go in smaller text under it.
+   Merge with spec 004: the flip button "↻" also sits bottom-right (44 px at 14 px), so the attribution is
+   moved just left of it (14 + 44 + 8 = 66 px) instead of under it; placement to validate by the product owner. */
+.attribution {
+  position: absolute;
+  right: 66px;
+  bottom: 14px;
+  max-width: calc(100% - 192px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #23202e;
+  line-height: 1.2;
+  text-align: right;
+}
+
+.google-maps {
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.providers,
+.authors {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0 6px;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.attribution a,
+.credit a {
+  color: inherit;
+}
+
+/* Website link icon (spec 007, FR-007, PO-14): top-left of the photo area, round like the distance pill. */
+.website {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--color-white);
+  color: #23202e;
+  cursor: pointer;
+}
+
+.website svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+/* Unsplash credit (spec 007, FR-015): top-right, the only free corner (link top-left, distance
+   bottom-left, Google attribution bottom-right); same discreet look as the Google attribution. */
+.credit {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  max-width: calc(100% - 74px);
+  margin: 0;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #23202e;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.2;
+  text-align: right;
+}
+
+/* Drag feedback: the whole photo is tinted and a large tilted stamp sits in its centre, so the
+   reaction about to be chosen is readable at a glance (replaces the small corner pill). */
+.stamp {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.stamp.like {
+  background: rgba(91, 75, 196, 0.45);
+}
+
+.stamp.nope {
+  background: rgba(176, 40, 74, 0.45);
+}
+
+.stamp-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 28px;
+  border: 5px solid var(--color-white);
+  border-radius: 20px;
+  color: var(--color-white);
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow: 0 2px 8px rgba(35, 32, 46, 0.35);
+  box-shadow: 0 12px 32px rgba(35, 32, 46, 0.25);
+}
+
+.stamp.like .stamp-label {
+  background: var(--color-primary);
+  transform: rotate(-12deg);
+}
+
+.stamp.nope .stamp-label {
+  background: #b0284a;
+  transform: rotate(12deg);
+}
+
+.stamp-icon {
+  font-size: 0.9em;
+  line-height: 1;
+}
+
+.body {
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.name {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.address {
+  margin: -6px 0 0;
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--color-muted);
+}
+
+/* Why the model picked this restaurant. */
+.reason {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.35;
+  font-style: italic;
+}
+
+.chips {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cuisine {
+  background: var(--color-panel);
+  color: #3f3196;
+}
+
+.keyword {
+  background: #e3f5e1;
+  color: #2f7a3a;
+}
+
+.price {
+  background: var(--color-page);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tile {
+  margin: 0;
+  border-radius: 18px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+  font-weight: 700;
+  min-width: 0;
+}
+
+.open {
+  background: #e3f5e1;
+  color: var(--color-text);
+}
+
+.open .tile-label {
+  color: #2f7a3a;
+}
+
+.taste {
+  background: #fdebdd;
+}
+
+.tile-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a24e12;
+}
+
+.dish-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.default-dish {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: #a24e12;
+  stroke-width: 1.5;
+}
+
+/* Back of the card (spec 004). The content scrolls inside the card (US1 AS4): swiping is off there. */
+.card.flipped {
+  cursor: default;
+  touch-action: pan-y;
+  user-select: auto;
+}
+
+.back {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: flip-in 300ms ease-out;
+}
+
+@keyframes flip-in {
+  from {
+    transform: rotateY(90deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .back {
+    animation: none;
+  }
+}
+
+.back-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.back-name {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.back-meta {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--color-muted);
+}
+
+.flip-btn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-white);
+  color: var(--color-ink, #23202e);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(35, 32, 46, 0.12);
+}
+
+.flip-btn.on-photo {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+}
+
+.back-tags {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.back-tag {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  background: #e3f5e1;
+  color: #2f7a3a;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.hours-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--color-muted);
+}
+
+.hours-row.targeted {
+  background: var(--color-panel);
+  color: #3f3196;
+  font-weight: 700;
+}
+
+.back-address {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.route-btn {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-panel);
+  color: #3f3196;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dish {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-page);
+}
+
+.dish-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dish-title {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.dish-desc {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.dish-price {
+  flex: none;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.back {
+  padding: 16px 20px 20px;
+}
+
+.back-name {
+  font-size: 22px;
+}
+
+/* The photo takes whatever height the card has left once the text is laid out, so the card
+     fits the phone screen with the buttons (see the deck stack). */
+.card {
+  display: flex;
+  flex-direction: column;
+}
+
+.hero {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 120px;
+}
+
+.body {
+  flex: none;
+  padding: 16px 20px 20px;
+}
+
+.name {
+  font-size: 22px;
+}
+
+.stamp-label {
+  font-size: 32px;
+  padding: 10px 22px;
+}
