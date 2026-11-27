@@ -151,11 +151,11 @@ describe('DeckStore', () => {
       expect(session.reactions()).toEqual([{ restaurantId: 'r1', kind: 'disliked' }]);
     });
 
-    it('opens the route screen on a pick (FR-008)', () => {
+    it('opens the choice screen on a pick (FR-008)', () => {
       setUp(5);
       store.react('picked');
 
-      expect(navigate).toHaveBeenCalledWith(['/route', 'r1']);
+      expect(navigate).toHaveBeenCalledWith(['/choice', 'r1']);
       expect(session.reactions()).toEqual([{ restaurantId: 'r1', kind: 'picked' }]);
     });
 

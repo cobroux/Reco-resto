@@ -1,0 +1,56 @@
+<article class="top-card" data-testid="top-card">
+  <div class="hero">
+    @if (item().restaurant.photoUrl; as photo) {
+      <img class="photo" [src]="photo" alt="" />
+    } @else {
+      <div class="tablecloth" aria-hidden="true"></div>
+    }
+    <span class="badge" [class.decided]="decided()">
+      {{ decided() ? texts.pick : results.suggestion }}
+    </span>
+  </div>
+  <div class="card-body">
+    <span class="card-name">{{ item().restaurant.name }}</span>
+    <div class="chips">
+      <span class="chip cuisine">{{ item().restaurant.cuisine }}</span>
+      @if (item().tag; as tag) {
+        <span class="chip tag">{{ tag }}</span>
+      }
+      @if (item().restaurant.priceLevel; as price) {
+        <span class="chip price">{{ price }}</span>
+      }
+    </div>
+    <div class="facts">
+      @if (item().closing; as closing) {
+        <div class="fact open">
+          <span class="fact-label">{{ texts.open }}</span>
+          <span class="fact-value">{{ texts.until(closing) }}</span>
+        </div>
+      }
+      <div class="fact distance">
+        <span class="fact-label">{{ results.distance }}</span>
+        <span class="fact-value">{{ item().distance }}</span>
+      </div>
+      @if (item().restaurant.dish; as dish) {
+        <div class="fact dish">
+          <span class="fact-label">{{ texts.toTaste }}</span>
+          <span class="fact-value">{{ dish.name }}</span>
+        </div>
+      }
+    </div>
+    <div class="card-actions">
+      <ng-content />
+      <button
+        type="button"
+        class="soft-btn detail-btn"
+        [attr.aria-expanded]="expanded()"
+        (click)="toggleDetail.emit()"
+      >
+        {{ expanded() ? texts.hideDetail : texts.detail }}
+      </button>
+    </div>
+    @if (expanded()) {
+      <app-restaurant-detail [item]="item()" />
+    }
+  </div>
+</article>

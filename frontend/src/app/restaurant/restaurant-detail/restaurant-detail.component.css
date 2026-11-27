@@ -1,0 +1,38 @@
+/* Takes the whole row when the parent lays its children out in a wrapping flex row. */
+:host {
+  display: block;
+  flex: 1 1 100%;
+}
+
+.detail {
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-panel);
+}
+
+.detail h3 {
+  margin: 14px 0 4px;
+  font-size: 13px;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.detail p {
+  margin: 0;
+}
+
+.meta {
+  color: var(--color-muted);
+}
+
+.hours-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  font-size: 14px;
+}
+
+.hours-row.targeted {
+  font-weight: 700;
+  color: var(--color-primary);
+}
