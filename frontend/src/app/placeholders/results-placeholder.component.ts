@@ -13,6 +13,7 @@ import { ReactionKind } from '../deck/deck.types';
 import { formatDistance } from '../deck/format/distance';
 import { closingTimeAt } from '../deck/format/opening';
 import { weeklyHoursRows } from '../deck/format/weekly-hours';
+import { RestaurantMapComponent } from '../map/restaurant-map.component';
 import { Restaurant } from '../restaurant/restaurant';
 import { SearchResultStore } from '../search/search-result.store';
 import { SessionReactionsService } from '../session/session-reactions.service';
@@ -43,7 +44,7 @@ interface ResultItem {
   selector: 'app-results-placeholder',
   templateUrl: './results-placeholder.component.html',
   styleUrl: './results-placeholder.component.css',
-  imports: [RouterLink, NgTemplateOutlet],
+  imports: [RouterLink, NgTemplateOutlet, RestaurantMapComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ResultsPlaceholderComponent {
@@ -91,6 +92,8 @@ export class ResultsPlaceholderComponent {
     this.items().filter((item) => item.kind === 'liked' && item !== this.top()),
   );
   protected readonly nopes = computed(() => this.items().filter((item) => item.kind === 'disliked'));
+  /** Device position of the search, shown on the map of the top card. */
+  protected readonly userPosition = computed(() => this.searchResult.result()?.userPosition ?? null);
   protected readonly nopeOpen = computed(() => this.nopeToggled() ?? this.top() === null);
 
   protected readonly title = computed(() => {

@@ -1,7 +1,8 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { catchError, from, map, Observable, switchMap, throwError } from 'rxjs';
+import { catchError, from, map, Observable, of, switchMap, throwError } from 'rxjs';
 import { DeckInput } from '../deck/deck.types';
+import { WalkingRouteService } from '../map/walking-route.service';
 import { toDeckInput } from './deck-input';
 import { Position, SearchErrorCode, SearchFailure, SearchResult } from './search-result';
 import { SearchService } from './search.service';
@@ -47,14 +48,46 @@ function failureOf(error: unknown): SearchFailure {
 @Injectable()
 export class HttpSearchService extends SearchService {
   private readonly http = inject(HttpClient);
+  private readonly walking = inject(WalkingRouteService);
 
   search(sentence: string): Observable<DeckInput> {
     return from(currentPosition()).pipe(
       switchMap((position) =>
-        this.http.post<SearchResult>('/api/search', position ? { sentence, position } : { sentence }),
+        this.http
+          .post<SearchResult>('/api/search', position ? { sentence, position } : { sentence })
+          .pipe(
+            map((result) => toDeckInput(result, new Date(), position)),
+            switchMap((input) => this.withWalkingDistances(input)),
+          ),
       ),
-      map((result) => toDeckInput(result)),
       catchError((error: unknown) => throwError(() => failureOf(error))),
     );
+  }
+
+  /**
+   * Replaces the straight-line distance of each restaurant by its walking distance, the one the map shows, so that
+   * the deck, the results and the map give the same distance. A restaurant without coordinates, or that the routing
+   * service does not answer for, keeps the distance of the backend.
+   */
+  private withWalkingDistances(input: DeckInput): Observable<DeckInput> {
+    const user = input.userPosition;
+    const located = input.restaurants.filter((restaurant) => restaurant.location);
+    if (!user || located.length === 0) {
+      return of(input);
+    }
+    return this.walking
+      .distances(user, located.map((restaurant) => restaurant.location!))
+      .pipe(
+        map((distances) => {
+          const walking = new Map(located.map((restaurant, i) => [restaurant.id, distances[i]]));
+          return {
+            ...input,
+            restaurants: input.restaurants.map((restaurant) => {
+              const meters = walking.get(restaurant.id);
+              return meters == null ? restaurant : { ...restaurant, distanceMeters: meters };
+            }),
+          };
+        }),
+      );
   }
 }

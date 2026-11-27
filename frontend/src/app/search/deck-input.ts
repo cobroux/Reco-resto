@@ -1,6 +1,6 @@
 import { DeckInput } from '../deck/deck.types';
 import { OpeningRange, Restaurant as DeckRestaurant } from '../restaurant/restaurant';
-import { Restaurant, SearchResult } from './search-result';
+import { Position, Restaurant, SearchResult } from './search-result';
 
 const PARIS = 'Europe/Paris';
 const LOCAL_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/;
@@ -65,6 +65,7 @@ function toDeckRestaurant(restaurant: Restaurant & { address: string; distanceMe
     id: restaurant.placeId ?? `${restaurant.name}|${restaurant.address}`,
     name: restaurant.name,
     address: restaurant.address,
+    location: restaurant.location,
     distanceMeters: restaurant.distanceMeters,
     cuisine: restaurant.cuisine ?? '',
     keywords: [...(restaurant.keywords ?? []), ...(restaurant.diets ?? [])],
@@ -88,8 +89,13 @@ function toDeckRestaurant(restaurant: Restaurant & { address: string; distanceMe
  * ("ce soir") is not returned by the backend, so the deck title uses its default. The cuisines and diets are
  * shown as the backend gives them (OpenStreetMap values, not translated).
  */
-export function toDeckInput(result: SearchResult, now: Date = new Date()): DeckInput {
+export function toDeckInput(
+  result: SearchResult,
+  now: Date = new Date(),
+  userPosition: Position | null = null,
+): DeckInput {
   return {
+    userPosition,
     momentLabel: null,
     targetDateTime: targetDateTime(result.criteria.moment, now),
     restaurants: result.deck

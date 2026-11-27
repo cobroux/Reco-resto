@@ -1,4 +1,4 @@
-import { DataProvider, PhotoAttribution } from '../search/search-result';
+import { DataProvider, PhotoAttribution, Position } from '../search/search-result';
 
 /** Opening range of one day, local time of the restaurant, "HH:mm". A close before open ends after midnight. */
 export interface OpeningRange {
@@ -36,6 +36,8 @@ export interface Restaurant {
   readonly dish?: Dish;
   /** Postal address when known, shown under the name (added at the request of the team; not in spec 003). */
   readonly address?: string;
+  /** Coordinates when the data source gives them; the results map needs them. */
+  readonly location?: Position;
   /** Website of the restaurant (spec 008). */
   readonly website?: string;
   /** Authors of the photo, shown with it (spec 008, FR-014). */

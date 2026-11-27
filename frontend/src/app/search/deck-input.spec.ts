@@ -83,6 +83,20 @@ describe('toDeckInput (spec 002 result for the swipe deck of spec 003)', () => {
       expect(mapped.dish).toEqual({ name: 'Curry vert' });
     });
 
+    it('carries the coordinates of the restaurant when the backend gives them', () => {
+      const location = { latitude: 48.85, longitude: 2.35 };
+
+      expect(first({ ...THAI, location }).location).toEqual(location);
+      expect(first(THAI).location).toBeUndefined();
+    });
+
+    it('carries the position of the user, null when unknown', () => {
+      const position = { latitude: 48.86, longitude: 2.34 };
+
+      expect(toDeckInput(resultOf('now', THAI), NOON_UTC_NOV, position).userPosition).toEqual(position);
+      expect(toDeckInput(resultOf('now', THAI), NOON_UTC_NOV).userPosition).toBeNull();
+    });
+
     it('carries the reason of the model', () => {
       expect(first({ ...THAI, reason: 'Curry réputé' }).reason).toBe('Curry réputé');
       expect(first(THAI).reason).toBeUndefined();
