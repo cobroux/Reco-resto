@@ -541,13 +541,10 @@
   touch-action: pan-y;
 }
 
-.name {
-  font-size: 22px;
-}
-
 /* The name is cut after two lines ("…"), the back of the card shows it in full. The reason is never
    cut: it is shown nowhere else, and the text scrolls when it does not fit (.body.scrollable). */
 .name {
+  font-size: 22px;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;

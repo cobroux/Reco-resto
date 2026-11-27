@@ -23,7 +23,7 @@
   bottom: 26px;
   left: 50%;
   transform: translateX(-50%);
-  /* Read by FIT_PADDING in restaurant-map.component.ts (NAME_LABEL_HALF_WIDTH): change both together. */
+  /* Measured by fitPadding (restaurant-map.component.ts) to keep the label inside the map. */
   max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;

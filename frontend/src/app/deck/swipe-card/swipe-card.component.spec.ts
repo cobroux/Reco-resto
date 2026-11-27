@@ -525,16 +525,25 @@ describe('SwipeCardComponent', () => {
   describe('text that does not fit (small phones)', () => {
     type Callback = () => void;
     let observed: Callback[];
+    /** Elements watched by the observers still connected. */
+    let watched: Set<Element>;
     const original = globalThis.ResizeObserver;
 
     beforeEach(() => {
       observed = [];
+      watched = new Set();
       globalThis.ResizeObserver = class {
+        private readonly mine: Element[] = [];
         constructor(private readonly callback: Callback) {
           observed.push(callback);
         }
-        observe(): void {}
-        disconnect(): void {}
+        observe(element: Element): void {
+          this.mine.push(element);
+          watched.add(element);
+        }
+        disconnect(): void {
+          this.mine.forEach((element) => watched.delete(element));
+        }
       } as unknown as typeof ResizeObserver;
     });
 
@@ -559,6 +568,17 @@ describe('SwipeCardComponent', () => {
 
       await resize(200, 200);
       expect(body().classList).not.toContain('scrollable');
+    });
+
+    it('watches the text that appears when the restaurant changes', async () => {
+      await create(BARE);
+      expect(root.querySelector('[data-testid="address"]')).toBeNull();
+
+      fixture.componentRef.setInput('restaurant', { ...BARE, address: '3 rue des Lilas, Paris' });
+      await fixture.whenStable();
+
+      const address = root.querySelector('[data-testid="address"]') as Element;
+      expect(watched.has(address)).toBe(true);
     });
 
     it('keeps the swipe up everywhere while the text fits', async () => {

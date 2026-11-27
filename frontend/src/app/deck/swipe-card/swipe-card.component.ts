@@ -4,8 +4,8 @@ import {
   DestroyRef,
   ElementRef,
   InjectionToken,
+  afterRenderEffect,
   computed,
-  effect,
   inject,
   input,
   output,
@@ -128,7 +128,10 @@ export class SwipeCardComponent {
 
   constructor() {
     inject(DestroyRef).onDestroy(() => clearTimeout(this.leaveTimer));
-    effect((onCleanup) => {
+    // After each render, so the text added by a new restaurant (same card, e.g. walking distances, @if address)
+    // is in the DOM and watched too: the body itself does not resize once the photo is at its minimum height.
+    afterRenderEffect((onCleanup) => {
+      this.restaurant();
       const element = this.body()?.nativeElement;
       if (!element || typeof ResizeObserver === 'undefined') {
         this.bodyScrolls.set(false);

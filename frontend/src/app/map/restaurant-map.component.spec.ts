@@ -5,7 +5,7 @@ import { vi } from 'vitest';
 import { Position } from '../search/search-result';
 import { mapCalls, resetMapCalls } from './maplibre-gl.mock';
 import { MapColors, buildMapStyle, readMapColors } from './map-style';
-import { RestaurantMapComponent } from './restaurant-map.component';
+import { FitPadding, RestaurantMapComponent, fitPadding } from './restaurant-map.component';
 import { WalkingRoute, WalkingRouteService } from './walking-route.service';
 
 vi.mock('maplibre-gl', async () => (await import('./maplibre-gl.mock')).maplibreMock);
@@ -250,13 +250,11 @@ describe('RestaurantMapComponent', () => {
       expect(mapCalls.fitBounds.length).toBe(1);
     });
 
-    it('leaves room above the points for the name label, so it stays inside the map', async () => {
+    it('frames with a padding per side', async () => {
       await create();
 
-      const options = mapCalls.fitBounds[0][1] as {
-        padding: { top: number; right: number; bottom: number; left: number };
-      };
-      expect(options.padding.top).toBeGreaterThan(options.padding.bottom);
+      const options = mapCalls.fitBounds[0][1] as { padding: FitPadding };
+      expect(Object.keys(options.padding).sort()).toEqual(['bottom', 'left', 'right', 'top']);
     });
 
     it('does not move on a pure redraw (name change)', async () => {
@@ -358,5 +356,34 @@ describe('readMapColors', () => {
 
     expect(colors.ground).toBe('#aaa');
     expect(colors.route).toBe('#bbb');
+  });
+});
+
+describe('fitPadding', () => {
+  /** Phone map of the results screen, with a 180 px label 64 px high and zoom buttons ending at 90 px. */
+  const PHONE = { width: 335, height: 300, labelAbove: 64, labelHalfWidth: 90, controlsBottom: 90 };
+
+  it('keeps the name label inside the map and below the zoom buttons', () => {
+    expect(fitPadding(PHONE)).toEqual({ top: 160, right: 96, bottom: 48, left: 96 });
+  });
+
+  it('keeps a 48 px margin without a label or zoom buttons', () => {
+    const bare = { ...PHONE, labelAbove: 0, labelHalfWidth: 0, controlsBottom: 0 };
+
+    expect(fitPadding(bare)).toEqual({ top: 48, right: 48, bottom: 48, left: 48 });
+  });
+
+  it('shrinks on a map too small for it, so the points are still framed', () => {
+    const padding = fitPadding({ ...PHONE, width: 160, height: 150 });
+
+    expect(padding.top + padding.bottom).toBeLessThanOrEqual(150 * 0.7);
+    expect(padding.left + padding.right).toBeLessThanOrEqual(160 * 0.7);
+    expect(padding.top).toBeGreaterThan(padding.bottom);
+  });
+
+  it('never goes negative on an empty map', () => {
+    const padding = fitPadding({ ...PHONE, width: 0, height: 0 });
+
+    expect(Object.values(padding).every((value) => value === 0)).toBe(true);
   });
 });
