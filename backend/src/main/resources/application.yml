@@ -1,3 +1,14 @@
+# MCP server "reco-resto": Streamable HTTP, http://localhost:8080/mcp (tools: SearchMcpTools).
+spring:
+  ai:
+    mcp:
+      server:
+        name: reco-resto
+        version: 0.0.1
+        protocol: STREAMABLE
+        streamable-http:
+          mcp-endpoint: /mcp
+
 search:
   default-radius-km: 2.5
   deck-size: 15

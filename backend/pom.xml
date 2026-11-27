@@ -20,12 +20,30 @@
     <springdoc.version>3.0.0</springdoc.version>
     <!-- Spec 007 TC-1, OQ-1: HTML parser of the restaurant website pages. -->
     <jsoup.version>1.24.1</jsoup.version>
+    <!-- MCP server (search/mcp): provides org.springframework.ai.mcp.annotation. -->
+    <spring-ai.version>2.0.0</spring-ai.version>
   </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.ai</groupId>
+        <artifactId>spring-ai-bom</artifactId>
+        <version>${spring-ai.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-webmvc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.ai</groupId>
+      <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springdoc</groupId>
