@@ -545,10 +545,9 @@
   font-size: 22px;
 }
 
-/* The name and the reason are cut after two lines ("…") so the chips and the tiles stay visible on
-   small phones (the card never grows past the screen). The back of the card shows the full name. */
-.name,
-.reason {
+/* The name is cut after two lines ("…"), the back of the card shows it in full. The reason is never
+   cut: it is shown nowhere else, and the text scrolls when it does not fit (.body.scrollable). */
+.name {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
