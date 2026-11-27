@@ -6,15 +6,12 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { DECK_TEXTS, RESULTS_TEXTS } from '../deck/deck.texts';
 import { ReactionKind } from '../deck/deck.types';
-import { formatDistance } from '../deck/format/distance';
-import { closingTimeAt } from '../deck/format/opening';
-import { weeklyHoursRows } from '../deck/format/weekly-hours';
-import { RestaurantMapComponent } from '../map/restaurant-map.component';
-import { Restaurant } from '../restaurant/restaurant';
+import { RestaurantDetailComponent } from '../restaurant/restaurant-detail/restaurant-detail.component';
+import { RestaurantTileComponent } from '../restaurant/restaurant-tile/restaurant-tile.component';
+import { RestaurantView, toRestaurantView } from '../restaurant/restaurant-view';
 import { SearchResultStore } from '../search/search-result.store';
 import { SessionReactionsService } from '../session/session-reactions.service';
 
@@ -29,14 +26,8 @@ const HEARTS = Array.from({ length: 12 }, (_, i) => ({
   delay: (i % 3) * 60,
 }));
 
-interface ResultItem {
-  readonly id: string;
+interface ResultItem extends RestaurantView {
   readonly kind: ReactionKind;
-  readonly restaurant: Restaurant;
-  readonly distance: string;
-  readonly closing: string | null;
-  readonly tag: string | undefined;
-  readonly hours: ReturnType<typeof weeklyHoursRows>;
 }
 
 /** Results screen: the "Miam" of the session, the choice ("On y va") and the "Pas miam" (feature 005). */
@@ -44,7 +35,7 @@ interface ResultItem {
   selector: 'app-results-placeholder',
   templateUrl: './results-placeholder.component.html',
   styleUrl: './results-placeholder.component.css',
-  imports: [RouterLink, NgTemplateOutlet, RestaurantMapComponent],
+  imports: [RouterLink, RestaurantDetailComponent, RestaurantTileComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ResultsPlaceholderComponent {
@@ -68,17 +59,7 @@ export class ResultsPlaceholderComponent {
       if (!restaurant) {
         return [];
       }
-      return [
-        {
-          id: restaurant.id,
-          kind: reaction.kind,
-          restaurant,
-          distance: formatDistance(restaurant.distanceMeters),
-          closing: closingTimeAt(restaurant.weeklyHours, targetDateTime),
-          tag: restaurant.keywords[0],
-          hours: weeklyHoursRows(restaurant.weeklyHours, targetDateTime),
-        },
-      ];
+      return [{ ...toRestaurantView(restaurant, targetDateTime), kind: reaction.kind }];
     });
   });
 

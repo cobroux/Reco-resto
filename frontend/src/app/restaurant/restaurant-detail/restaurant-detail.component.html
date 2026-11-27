@@ -1,0 +1,25 @@
+<div class="detail" data-testid="detail">
+  <p class="meta">
+    {{ item().restaurant.cuisine }} · {{ item().distance }}
+    @if (item().restaurant.priceLevel; as price) {
+      · {{ price }}
+    }
+  </p>
+  @if (item().restaurant.address; as address) {
+    <h3>{{ texts.addressTitle }}</h3>
+    <p data-testid="detail-address">{{ address }}</p>
+  }
+  @if (item().restaurant.phone; as phone) {
+    <h3>{{ texts.phone }}</h3>
+    <p data-testid="detail-phone">{{ phone }}</p>
+  }
+  @if (item().hours.length) {
+    <h3>{{ texts.hours }}</h3>
+    @for (row of item().hours; track row.day) {
+      <div class="hours-row" [class.targeted]="row.targeted">
+        <span>{{ row.day }}</span>
+        <span>{{ row.ranges }}</span>
+      </div>
+    }
+  }
+</div>

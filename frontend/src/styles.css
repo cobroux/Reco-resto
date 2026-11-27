@@ -31,3 +31,50 @@ body {
 input::placeholder {
   color: var(--color-placeholder);
 }
+
+/* Action buttons shared by the results screen, the choice screen and the restaurant tile. */
+.primary-btn,
+.soft-btn {
+  font-family: inherit;
+  cursor: pointer;
+  border: 0;
+  text-decoration: none;
+  transition:
+    transform 160ms ease,
+    background-color 200ms ease,
+    opacity 200ms ease;
+  flex: 1 1 140px;
+  height: 54px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.primary-btn {
+  background: var(--color-primary);
+  color: var(--color-white);
+}
+
+.soft-btn {
+  background: var(--color-page);
+  color: var(--color-text);
+}
+
+.primary-btn:active,
+.soft-btn:active {
+  transform: scale(0.95);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
