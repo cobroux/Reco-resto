@@ -7,10 +7,6 @@
       "Bash(mvn -f backend test:*)",
       "Bash(npm --prefix frontend test:*)",
       "Bash(npm --prefix frontend run build:*)"
-    ],
-    "deny": [
-      "Bash(git push:*)",
-      "Bash(gh pr create:*)"
     ]
   }
 }

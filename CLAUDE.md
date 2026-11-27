@@ -1,48 +1,72 @@
 # Reco-Resto
 
-Team project (4 contributors). Backend and frontend live in one monorepo and follow Spec-Driven Development with Spec Kit.
+Application web mobile de recommandation de restaurants : recherche en langage naturel, deck à swiper, fiche enrichie, carte avec trajet à pied. Un seul développeur pour le moment.
 
-## Stack and layout
+## Stack et arborescence
 
-- `backend/`: Java 21, Spring Boot 4.1.1, Maven. Base package `hr.emocio.recoresto`.
-- `frontend/`: Angular 22.
-- `specs/<NNN>-<feature>/`: Spec Kit documents (spec, plan, tasks, checklists). `.specify/`: Spec Kit templates, scripts and constitution.
-- `.claude/`: shared settings and Spec Kit skills (`/speckit-*`). Personal overrides go in `.claude/settings.local.json` (ignored).
+- `backend/` : Java 21, Spring Boot 4.1.1, Maven, package `hr.emocio.recoresto` (Google Places, LLM). Pas de base de données.
+- `frontend/` : Angular 22, Vitest, MapLibre.
+- `specs/<NNN>-<feature>/` : documents Spec Kit. `.specify/` : templates et constitution.
+- `.claude/agents/` : l'équipe. `.claude/skills/` : Spec Kit (`/speckit-*`).
 
-## Commands
+## Commandes
 
-- Backend: `mvn -f backend test`, `mvn -f backend spring-boot:run`
-- Frontend: `npm --prefix frontend install`, `npm --prefix frontend start`, `npm --prefix frontend test -- --watch=false`, `npm --prefix frontend run build`
+- Backend : `mvn -f backend test`, `mvn -f backend spring-boot:run`
+- Frontend : `npm --prefix frontend install|start`, `npm --prefix frontend test -- --watch=false`, `npm --prefix frontend run build`
 
-## Conventions
+## Se repérer avant de chercher
 
-- Everything is written in English: code, comments, docs, specs, commit messages, PRs.
-- Branches: `feat/<slug>`, `fix/<slug>`, `chore/<slug>`. Never commit directly to `main`.
-- Commits: Conventional Commits (`feat: ...`, `fix: ...`, `docs: ...`, `chore: ...`).
-- Tests first. Backend tests in `backend/src/test/java` (mirror the package of the class under test); frontend tests next to the code as `*.spec.ts`.
-- Agents never push and never open PRs; humans do. Agents commit only when asked.
+- Code : `graphify update .` (gratuit, sans LLM) après des modifications, puis `graphify explain "Symbole"`, `graphify path "A" "B"` ou `graphify query "NomDeSymbole" --budget 1500`. Un nom de symbole marche mieux qu'une phrase ; en cas d'ambiguïté, relancer avec l'id complet que la commande propose. Le graphe ne couvre que le code (`graphify-out/`, ignoré par git) : ni specs, ni docs, ni YAML.
+- Historique et décisions passées : claude-mem (`mem_search`).
+- Puis lire seulement les fichiers désignés. Le code fait foi sur le graphe et la mémoire.
 
-## Spec Kit workflow
+## Langue
 
-Run the skills in order (the human validates each pause):
-1. `/speckit-specify <need>` → `specs/<NNN>-<feature>/spec.md` (WHAT/WHY) — pause.
-2. `/speckit-clarify` (optional) → resolve open questions in the spec.
-3. `/speckit-plan` → `plan.md` (architecture, contracts) — pause.
-4. `/speckit-tasks` → `tasks.md` — pause.
-5. `/speckit-implement` → code and tests (tests first).
-6. `/speckit-analyze` (optional) → cross-document consistency report.
+- En français : échanges, docs, specs, agents, messages de commit, PR.
+- En anglais : identifiants et commentaires de code (cohérence avec l'existant).
+- Les documents existants en anglais ne sont traduits que s'ils sont réécrits.
 
-One feature per branch and per `specs/<NNN>-<feature>/` folder. Details: `specs/README.md`.
+## Git et déploiement
 
-## Never guess
+- Branches `feat/<slug>`, `fix/<slug>`, `chore/<slug>`. Jamais de commit ni de push direct sur `main`, jamais de force-push.
+- Commits : une ligne Conventional Commits.
+- Les agents peuvent commiter, pousser et ouvrir des PR quand je le demande.
+- **Un merge sur `main` déploie en production** (`.github/workflows/deploy.yml`, voir `docs/deployment.md`) : ne jamais merger sans mon accord explicite.
+- Aucun secret dans le dépôt ; tenir `.env.example` à jour.
 
-- If a request is ambiguous or information is missing, ask before acting. Ask all open questions in a single batch, before writing code.
-- Always ask when missing or unclear: business values (rates, scales, thresholds, limits, dates) not readable from the code; intended behavior for edge cases and errors; the location, name or shape of what must be created when several options exist; whether an existing behavior may be changed.
-- Do not fill a gap with an assumed value, even a plausible one. If you must proceed with an unverified value, say so in the final answer and flag it for validation.
-- Do not ask about choices that follow an established convention of the code base or language; apply it and mention it.
+## Règles de travail
 
-## DRY
+- **Ne jamais deviner.** Valeurs métier, cas limites, erreurs, emplacement ou forme d'un nouvel élément, changement de comportement : demander, toutes les questions en une fois, avant de coder. Signaler toute valeur non vérifiée. Les conventions établies s'appliquent sans demander.
+- **DRY.** Chercher l'existant (par comportement et mots-clés) avant d'écrire ; étendre en place, mettre à jour appelants et tests, supprimer le code remplacé. Dire ce qui a été réutilisé.
+- **Minimal (ponytail).** Le plus petit changement complet ; pas d'abstraction ni d'option non demandée ; pas de dépendance pour quelques lignes. Ne jamais rogner validation aux frontières, sécurité, accessibilité.
+- **Tests d'abord**, vus échouer. Back : `backend/src/test/java` (même package) ; front : `*.spec.ts` à côté du code.
+- **Bug :** trouver la cause racine avant de corriger (`superpowers:systematic-debugging`).
+- **Terminé = vérifié** : commande lancée et sortie lue avant d'annoncer que ça marche.
+- **Réponses courtes**, sans récapitulatif.
 
-- Every piece of knowledge (logic, constant, rule, data table) has a single authoritative representation. Before writing code, search the code base (by behavior and related keywords) for something to reuse or extend; check logic, constants and data tables, not only functions.
-- Extend or generalize existing code in place rather than adding a parallel version; update every caller and test if a signature changes; remove replaced code in the same change.
-- Report what was reused, extended or replaced, or state that nothing relevant was found.
+## Spec Kit
+
+Réservé aux grosses fonctionnalités (nouveau parcours, nouveau contrat API, plusieurs jours) : `/speckit-specify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-implement`, avec ma validation à chaque pause (voir `specs/README.md`). Petites évolutions et correctifs : en direct, avec tests.
+
+## Équipe
+
+La session principale fait elle-même les petites tâches. Elle délègue seulement les tâches lourdes ou parallélisables, ou quand je le demande.
+
+| Agent | Quand | Modèle / effort |
+|---|---|---|
+| `product-owner` | besoin flou, périmètre, critères d'acceptation | sonnet / medium |
+| `architect` | contrat API, découpage, décision structurante | opus / medium |
+| `ux-designer` | parcours, écran, motion, accessibilité | opus / medium |
+| `frontend-dev` | code Angular | sonnet / medium |
+| `backend-dev` | code Spring Boot | sonnet / medium |
+| `devops` | Docker, CI/CD, EC2, Caddy, nginx | sonnet / medium |
+| `reviewer` | avant PR : bugs, sécurité, sur-ingénierie | opus / medium |
+| `qa` | lancer tests et application, vérifier un parcours | haiku / medium |
+
+Jamais d'Opus en effort `high` ou plus.
+
+Ordre d'une grosse fonctionnalité : product-owner → architect + ux-designer → frontend-dev et backend-dev (en parallèle une fois le contrat fixé) → qa → reviewer. Un agent ne peut pas me parler : il rend ses questions à la session principale, qui me les pose.
+
+## Skills
+
+N'invoquer que celui qui sert directement la tâche, jamais de chaîne de skills de process pour un petit correctif. Chaque agent liste les siens.
