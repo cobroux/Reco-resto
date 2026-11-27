@@ -186,7 +186,7 @@
       </div>
     </div>
 
-    <div class="body">
+    <div #body class="body" [class.scrollable]="bodyScrolls()">
       <h2 class="name">{{ restaurant().name }}</h2>
       @if (restaurant().address; as address) {
         <p class="address" data-testid="address">{{ address }}</p>
