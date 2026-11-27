@@ -156,11 +156,11 @@ describe('DeckComponent', () => {
       expect(text()).toContain('2 sur 15');
     });
 
-    it('picks with "→" labelled "On y va" and opens the route screen (AS3, D4)', async () => {
+    it('picks with "→" labelled "On y va" and opens the choice screen (AS3, D4)', async () => {
       expect(button(DECK_TEXTS.pick).textContent).toContain('→');
       await click(button(DECK_TEXTS.pick));
 
-      expect(navigate).toHaveBeenCalledWith(['/route', 'stub-01']);
+      expect(navigate).toHaveBeenCalledWith(['/choice', 'stub-01']);
     });
 
     it('reacts to a swipe of the card', async () => {

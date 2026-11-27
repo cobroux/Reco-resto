@@ -1,0 +1,28 @@
+<header class="header">
+  <a class="logo" routerLink="/" data-testid="home-link" [attr.aria-label]="texts.backToHome">
+    <span class="logo-mark" aria-hidden="true"></span>{{ texts.logo }}
+  </a>
+</header>
+
+<main class="page">
+  @if (item; as view) {
+    <app-restaurant-tile
+      [item]="view"
+      [decided]="true"
+      [expanded]="expanded()"
+      (toggleDetail)="toggleDetail()"
+    >
+      <a class="primary-btn" data-testid="itinerary" [routerLink]="['/route', id]">{{
+        results.itinerary
+      }}</a>
+      <button
+        type="button"
+        class="soft-btn"
+        data-testid="change-mind"
+        (click)="store.returnFromPick()"
+      >
+        {{ results.changeMind }}
+      </button>
+    </app-restaurant-tile>
+  }
+</main>

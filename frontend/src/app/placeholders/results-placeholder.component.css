@@ -99,181 +99,6 @@ h1 {
   color: var(--color-placeholder);
 }
 
-/* ---------- Big card ---------- */
-.top-card {
-  display: flex;
-  flex-wrap: wrap;
-  background: var(--color-white);
-  border-radius: 36px;
-  overflow: hidden;
-  box-shadow: 0 20px 50px rgba(76, 60, 160, 0.12);
-  animation: fade-up 650ms 150ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
-}
-
-.hero {
-  flex: 1 1 300px;
-  min-height: 300px;
-  position: relative;
-}
-
-.photo,
-.tablecloth {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/* Default visual in the style of the Nappe logo (gingham), as on the deck cards. */
-.tablecloth {
-  background-color: var(--color-white);
-  background-image: var(--nappe-gingham);
-  background-size: 28px 28px;
-}
-
-.badge {
-  position: absolute;
-  left: 18px;
-  top: 18px;
-  height: 36px;
-  padding: 0 14px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  font-size: 14px;
-  font-weight: 700;
-  background: var(--color-white);
-  color: #3f3196;
-  animation: pop 500ms 300ms cubic-bezier(0.3, 1.6, 0.5, 1) both;
-}
-
-.badge.decided {
-  background: var(--color-primary);
-  color: var(--color-white);
-}
-
-.card-body {
-  flex: 1 1 340px;
-  min-width: 0;
-  padding: 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.card-name {
-  font-size: 34px;
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.chip {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.chip.cuisine {
-  background: var(--color-panel);
-  color: #3f3196;
-}
-
-.chip.tag {
-  background: #e3f5e1;
-  color: #2f7a3a;
-}
-
-.chip.price {
-  background: var(--color-page);
-}
-
-.facts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.fact {
-  border-radius: 18px;
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.fact-label {
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.fact-value {
-  font-size: 15px;
-  font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fact.open {
-  background: #e3f5e1;
-}
-.fact.open .fact-label {
-  color: #2f7a3a;
-}
-.fact.distance {
-  background: var(--color-panel);
-}
-.fact.distance .fact-label {
-  color: #3f3196;
-}
-.fact.dish {
-  background: #fdebdd;
-}
-.fact.dish .fact-label {
-  color: #a24e12;
-}
-
-.card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 4px;
-}
-
-.primary-btn,
-.soft-btn {
-  flex: 1 1 140px;
-  height: 54px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.primary-btn {
-  background: var(--color-primary);
-  color: var(--color-white);
-}
-
-.soft-btn {
-  background: var(--color-page);
-  color: var(--color-text);
-}
-
 .small {
   flex: 0 0 auto;
   height: 40px;
@@ -380,11 +205,6 @@ h1 {
   font-size: 15px;
 }
 
-.other .detail,
-.top-card .detail {
-  flex: 1 1 100%;
-}
-
 /* ---------- "Pas miam" ---------- */
 .nope-section {
   background: var(--color-white);
@@ -462,40 +282,6 @@ h1 {
   animation: fade-up 650ms 520ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
 }
 
-/* ---------- Detail (expanded in place) ---------- */
-.detail {
-  margin-top: 4px;
-  padding-top: 14px;
-  border-top: 1px solid var(--color-panel);
-}
-
-.detail h3 {
-  margin: 14px 0 4px;
-  font-size: 13px;
-  text-transform: uppercase;
-  color: var(--color-muted);
-}
-
-.detail p {
-  margin: 0;
-}
-
-.meta {
-  color: var(--color-muted);
-}
-
-.hours-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 2px 0;
-  font-size: 14px;
-}
-
-.hours-row.targeted {
-  font-weight: 700;
-  color: var(--color-primary);
-}
-
 /* ---------- Hearts when a restaurant is chosen ---------- */
 .burst {
   position: absolute;
@@ -523,31 +309,6 @@ h1 {
 
 .heart.pink {
   color: #f28db5;
-}
-
-@keyframes fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(18px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes pop {
-  0% {
-    transform: scale(0.4);
-    opacity: 0;
-  }
-  60% {
-    transform: scale(1.15);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-  }
 }
 
 @keyframes beat {
@@ -618,18 +379,6 @@ h1 {
 
   .subtitle {
     font-size: 16px;
-  }
-
-  .card-body {
-    padding: 24px 20px;
-  }
-
-  .card-name {
-    font-size: 28px;
-  }
-
-  .facts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .other-actions {

@@ -85,13 +85,13 @@ export class DeckStore {
     const reacted = recordReaction(state, kind);
     if (kind === 'picked') {
       this.update(reacted);
-      void this.router.navigate(['/route', currentCard(reacted)!.id]);
+      void this.router.navigate(['/choice', currentCard(reacted)!.id]);
       return;
     }
     this.continueAfterReaction(reacted);
   }
 
-  /** Back from the route screen: the pick counts as liked and the deck goes on (FR-014, D12). */
+  /** Back from the choice screen: the pick counts as liked and the deck goes on (FR-014, D12). */
   returnFromPick(): void {
     const state = this.stateValue();
     if (!state || state.status !== 'picked') {

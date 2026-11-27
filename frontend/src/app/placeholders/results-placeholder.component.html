@@ -35,73 +35,25 @@
   </div>
 
   @if (top(); as item) {
-    <article class="top-card" data-testid="top-card">
-      <div class="hero">
-        @if (item.restaurant.photoUrl; as photo) {
-          <img class="photo" [src]="photo" alt="" />
-        } @else {
-          <div class="tablecloth" aria-hidden="true"></div>
-        }
-        <span class="badge" [class.decided]="decided()">
-          {{ decided() ? texts.pick : results.suggestion }}
-        </span>
-      </div>
-      <div class="card-body">
-        <span class="card-name">{{ item.restaurant.name }}</span>
-        <div class="chips">
-          <span class="chip cuisine">{{ item.restaurant.cuisine }}</span>
-          @if (item.tag; as tag) {
-            <span class="chip tag">{{ tag }}</span>
-          }
-          @if (item.restaurant.priceLevel; as price) {
-            <span class="chip price">{{ price }}</span>
-          }
-        </div>
-        <div class="facts">
-          @if (item.closing; as closing) {
-            <div class="fact open">
-              <span class="fact-label">{{ texts.open }}</span>
-              <span class="fact-value">{{ texts.until(closing) }}</span>
-            </div>
-          }
-          <div class="fact distance">
-            <span class="fact-label">{{ results.distance }}</span>
-            <span class="fact-value">{{ item.distance }}</span>
-          </div>
-          @if (item.restaurant.dish; as dish) {
-            <div class="fact dish">
-              <span class="fact-label">{{ texts.toTaste }}</span>
-              <span class="fact-value">{{ dish.name }}</span>
-            </div>
-          }
-        </div>
-        <div class="card-actions">
-          @if (decided()) {
-            <a class="primary-btn" data-testid="itinerary" [routerLink]="['/route', item.id]">{{
-              results.itinerary
-            }}</a>
-            <button type="button" class="soft-btn" data-testid="change-mind" (click)="like(item.id)">
-              {{ results.changeMind }}
-            </button>
-          } @else {
-            <button type="button" class="primary-btn" data-testid="go-top" (click)="pick(item.id)">
-              {{ texts.pick }}
-            </button>
-          }
-          <button
-            type="button"
-            class="soft-btn detail-btn"
-            [attr.aria-expanded]="expandedId() === item.id"
-            (click)="toggleDetail(item.id)"
-          >
-            {{ expandedId() === item.id ? texts.hideDetail : texts.detail }}
-          </button>
-        </div>
-        @if (expandedId() === item.id) {
-          <ng-container *ngTemplateOutlet="detailTpl; context: { $implicit: item }" />
-        }
-      </div>
-    </article>
+    <app-restaurant-tile
+      [item]="item"
+      [decided]="decided()"
+      [expanded]="expandedId() === item.id"
+      (toggleDetail)="toggleDetail(item.id)"
+    >
+      @if (decided()) {
+        <a class="primary-btn" data-testid="itinerary" [routerLink]="['/route', item.id]">{{
+          results.itinerary
+        }}</a>
+        <button type="button" class="soft-btn" data-testid="change-mind" (click)="like(item.id)">
+          {{ results.changeMind }}
+        </button>
+      } @else {
+        <button type="button" class="primary-btn" data-testid="go-top" (click)="pick(item.id)">
+          {{ texts.pick }}
+        </button>
+      }
+    </app-restaurant-tile>
   } @else {
     <div class="empty-card" data-testid="empty-card">
       <span class="empty-title">{{ results.emptyCardTitle }}</span>
@@ -142,7 +94,7 @@
             </button>
           </div>
           @if (expandedId() === item.id) {
-            <ng-container *ngTemplateOutlet="detailTpl; context: { $implicit: item }" />
+            <app-restaurant-detail [item]="item" />
           }
         </div>
       }
@@ -178,31 +130,3 @@
     <a class="redo" data-testid="deck-link" routerLink="/deck">{{ results.redo }}</a>
   }
 </main>
-
-<ng-template #detailTpl let-item>
-  <div class="detail" data-testid="detail">
-    <p class="meta">
-      {{ item.restaurant.cuisine }} · {{ item.distance }}
-      @if (item.restaurant.priceLevel; as price) {
-        · {{ price }}
-      }
-    </p>
-    @if (item.restaurant.address; as address) {
-      <h3>{{ texts.addressTitle }}</h3>
-      <p data-testid="detail-address">{{ address }}</p>
-    }
-    @if (item.restaurant.phone; as phone) {
-      <h3>{{ texts.phone }}</h3>
-      <p data-testid="detail-phone">{{ phone }}</p>
-    }
-    @if (item.hours.length) {
-      <h3>{{ texts.hours }}</h3>
-      @for (row of item.hours; track row.day) {
-        <div class="hours-row" [class.targeted]="row.targeted">
-          <span>{{ row.day }}</span>
-          <span>{{ row.ranges }}</span>
-        </div>
-      }
-    }
-  </div>
-</ng-template>
