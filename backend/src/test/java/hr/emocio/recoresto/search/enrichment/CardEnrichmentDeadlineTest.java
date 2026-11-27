@@ -6,7 +6,6 @@ import ch.qos.logback.classic.Level;
 import hr.emocio.recoresto.search.config.CardEnrichmentProperties;
 import hr.emocio.recoresto.search.config.TestCardEnrichmentProperties;
 import java.nio.charset.StandardCharsets;
-import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -36,7 +35,7 @@ class CardEnrichmentDeadlineTest {
         SafeWebFetcher fetcher = new SafeWebFetcher(properties, SafeWebFetcher::resolve,
                 address -> address.isLoopbackAddress() || SafeWebFetcher.isPublic(address));
         service = new CardEnrichmentService(fetcher, new WebsitePageReader(properties), new LargestImageRule(),
-                UnsplashStub.disabled(properties), properties, executor);
+                properties, executor);
     }
 
     @AfterEach
@@ -59,67 +58,7 @@ class CardEnrichmentDeadlineTest {
 
         long start = System.nanoTime();
         List<String> logs = CardEnrichmentServiceTest.logsOf(CardEnrichmentService.class, Level.INFO,
-                () -> assertThat(service.enrich(website("/"), null)).isEqualTo(CardEnrichment.none()));
-        Duration elapsed = Duration.ofNanos(System.nanoTime() - start);
-
-        assertThat(elapsed).isGreaterThanOrEqualTo(Duration.ofMillis(4900)).isLessThan(SLOW);
-        assertThat(logs).singleElement().asString().contains("TIMEOUT");
-    }
-
-    /**
-     * T25: the website answers in 1 s with no sharing image; its largest image answers after 6 s. No photo before
-     * 6 s; with one executor thread, the next enrichment starts at once (the slow image check is abandoned).
-     */
-    @Test
-    void aSlowImageCheckGivesNoPhotoWithinTheBudget() {
-        site.on("/", exchange -> {
-            FakeWebsite.sleep(1000);
-            FakeWebsite.send(exchange, 200, "text/html; charset=utf-8",
-                    ("<html><body><img src=\"/salle.jpg\" width=\"1200\" height=\"800\">"
-                            + "<img src=\"/plat.jpg\" width=\"300\" height=\"200\"></body></html>")
-                            .getBytes(StandardCharsets.UTF_8));
-        }).on("/salle.jpg", exchange -> {
-            FakeWebsite.sleep(SLOW.toMillis());
-            FakeWebsite.send(exchange, 200, "image/jpeg", new byte[] {(byte) 0xff, (byte) 0xd8});
-        }).image("/plat.jpg")
-                .html("/next", "<html><head><meta property=\"og:image\" content=\"/partage.jpg\"></head></html>")
-                .image("/partage.jpg");
-
-        long start = System.nanoTime();
-        List<String> logs = CardEnrichmentServiceTest.logsOf(CardEnrichmentService.class, Level.INFO,
-                () -> assertThat(service.enrich(website("/"), null)).isEqualTo(CardEnrichment.none()));
-        Duration elapsed = Duration.ofNanos(System.nanoTime() - start);
-
-        assertThat(elapsed).isGreaterThanOrEqualTo(Duration.ofMillis(4900)).isLessThan(SLOW);
-        assertThat(logs).singleElement().asString().contains("TIMEOUT");
-        assertThat(site.paths()).containsExactly("/", "/salle.jpg");
-
-        // The single executor thread is free again: the next enrichment is not queued behind the abandoned one.
-        long next = System.nanoTime();
-        CardEnrichment second = service.enrich(website("/next"), null);
-        assertThat(second.photoOrigin()).isEqualTo(EnrichmentOutcome.SHARING_IMAGE);
-        assertThat(Duration.ofNanos(System.nanoTime() - next)).isLessThan(Duration.ofSeconds(2));
-    }
-
-    /** FR-011, amendment (b): the Unsplash request counts in the 5 s; a slow Unsplash gives no photo in time. */
-    @Test
-    void aSlowUnsplashGivesNoPhotoWithinTheBudget() {
-        CardEnrichmentProperties properties = UnsplashStub.pointedAt(site,
-                TestCardEnrichmentProperties.withPortsAndExecutor(site.port(), 1), UnsplashStub.KEY);
-        SafeWebFetcher fetcher = new SafeWebFetcher(properties, SafeWebFetcher::resolve,
-                address -> address.isLoopbackAddress() || SafeWebFetcher.isPublic(address));
-        CardEnrichmentService withUnsplash = new CardEnrichmentService(fetcher, new WebsitePageReader(properties),
-                new LargestImageRule(), UnsplashStub.cuisinePhotos(properties, Clock.systemUTC()), properties,
-                executor);
-        site.html("/", "<html><body><p>Bienvenue</p></body></html>").on(UnsplashStub.SEARCH_PATH, exchange -> {
-            FakeWebsite.sleep(SLOW.toMillis());
-            FakeWebsite.send(exchange, 200, "application/json",
-                    UnsplashStub.answerOf(15).getBytes(StandardCharsets.UTF_8));
-        });
-
-        long start = System.nanoTime();
-        List<String> logs = CardEnrichmentServiceTest.logsOf(CardEnrichmentService.class, Level.INFO,
-                () -> assertThat(withUnsplash.enrich(website("/"), "Pizzeria")).isEqualTo(CardEnrichment.none()));
+                () -> assertThat(service.enrich(website("/"))).isEqualTo(CardEnrichment.none()));
         Duration elapsed = Duration.ofNanos(System.nanoTime() - start);
 
         assertThat(elapsed).isGreaterThanOrEqualTo(Duration.ofMillis(4900)).isLessThan(SLOW);

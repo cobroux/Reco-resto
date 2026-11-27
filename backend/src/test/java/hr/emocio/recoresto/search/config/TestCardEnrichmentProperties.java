@@ -1,6 +1,5 @@
 package hr.emocio.recoresto.search.config;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,9 +14,7 @@ public final class TestCardEnrichmentProperties {
 
     public static CardEnrichmentProperties defaults() {
         return new CardEnrichmentProperties(5, 1_048_576, 100, 5, List.of(80, 443),
-                "RecoResto/0.1 (proof of concept)", 8,
-                new CardEnrichmentProperties.Unsplash("https://api.unsplash.com", "", "reco_resto", 15,
-                        Duration.ofHours(1)));
+                "RecoResto/0.1 (proof of concept)", 8);
     }
 
     /** The defaults plus one more allowed port (the port of a local fake server). */
@@ -31,6 +28,6 @@ public final class TestCardEnrichmentProperties {
         List<Integer> ports = new ArrayList<>(d.allowedPorts());
         ports.add(port);
         return new CardEnrichmentProperties(d.budgetSeconds(), d.maxPageBytes(), d.minImageSizePx(),
-                d.maxRedirects(), ports, d.userAgent(), executorSize, d.unsplash());
+                d.maxRedirects(), ports, d.userAgent(), executorSize);
     }
 }

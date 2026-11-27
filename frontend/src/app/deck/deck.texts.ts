@@ -19,9 +19,6 @@ export const DECK_TEXTS = {
   googleMaps: 'Google Maps',
   /** Accessible name of the website link icon (spec 007, FR-007, PO-14). */
   website: 'Site du restaurant',
-  /** Unsplash credit "Photo : <photographer> / Unsplash" (spec 007, FR-015). */
-  photoBy: 'Photo :',
-  unsplash: 'Unsplash',
   backToHome: "Retour à l'accueil",
   // Back of the card (spec 004); wording of the labels is a proposal to validate (plan D-04-2, D-04-11, D-04-12).
   flip: 'Retourner la carte',

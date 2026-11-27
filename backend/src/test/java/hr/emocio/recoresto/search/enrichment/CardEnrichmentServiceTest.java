@@ -9,7 +9,6 @@ import ch.qos.logback.core.read.ListAppender;
 import hr.emocio.recoresto.search.config.CardEnrichmentProperties;
 import hr.emocio.recoresto.search.config.TestCardEnrichmentProperties;
 import java.net.URI;
-import java.time.Clock;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -20,9 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
 /**
- * Spec 007 T5, T7, T8, T9, T10, T11, T12, T26, T28, T30, SC-002, SC-005, FR-006; amendment (b) T31, T33-T36;
- * research R12; data-model.md "State flow", "Card enrichment" ({@code photoUrl}, {@code photoOrigin}). Real reader
- * and rule, local fake website (also the Unsplash stub).
+ * Spec 007 T5, T7, T8, T9, T10, T11, T12, T26, T28, T30, SC-002, SC-005, FR-006; research R12; data-model.md "State flow", "Card enrichment" ({@code photoUrl}, {@code photoOrigin}). Real reader
+ * and rule, local fake website.
  */
 class CardEnrichmentServiceTest {
 
@@ -44,7 +42,7 @@ class CardEnrichmentServiceTest {
         SafeWebFetcher fetcher = new SafeWebFetcher(properties, SafeWebFetcher::resolve,
                 address -> address.isLoopbackAddress() || SafeWebFetcher.isPublic(address));
         service = new CardEnrichmentService(fetcher, new WebsitePageReader(properties), new LargestImageRule(),
-                UnsplashStub.disabled(properties), properties, executor);
+                properties, executor);
     }
 
     @AfterEach
@@ -62,7 +60,7 @@ class CardEnrichmentServiceTest {
     }
 
     private CardEnrichment enrich(String path) {
-        return service.enrich(website(path), null);
+        return service.enrich(website(path));
     }
 
     private static String page(String head, String body) {
@@ -181,7 +179,7 @@ class CardEnrichmentServiceTest {
         WebsiteAddress closed = website("/");
         site.close();
 
-        List<String> logs = infoLogs(() -> assertThat(service.enrich(closed, null))
+        List<String> logs = infoLogs(() -> assertThat(service.enrich(closed))
                 .isEqualTo(CardEnrichment.none()));
 
         assertThat(logs).singleElement().asString().contains("UNREACHABLE");
@@ -213,10 +211,10 @@ class CardEnrichmentServiceTest {
     void aBlockedAddressGivesNoPhoto() {
         SafeWebFetcher strict = new SafeWebFetcher(properties);
         CardEnrichmentService production = new CardEnrichmentService(strict, new WebsitePageReader(properties),
-                new LargestImageRule(), UnsplashStub.disabled(properties), properties, executor);
+                new LargestImageRule(), properties, executor);
         site.html("/", page("", ""));
 
-        List<String> logs = infoLogs(() -> assertThat(production.enrich(website("/"), null))
+        List<String> logs = infoLogs(() -> assertThat(production.enrich(website("/")))
                 .isEqualTo(CardEnrichment.none()));
 
         assertThat(logs).singleElement().asString().contains("BLOCKED_ADDRESS");
@@ -229,7 +227,7 @@ class CardEnrichmentServiceTest {
         site.html("/", page("<meta property=\"og:image\" content=\"/salle.jpg\">", "<p>Menu secret du jour</p>"))
                 .image("/salle.jpg");
 
-        List<String> logs = infoLogs(() -> service.enrich(website("/"), null));
+        List<String> logs = infoLogs(() -> service.enrich(website("/")));
 
         assertThat(logs).singleElement().asString().contains("SHARING_IMAGE").contains("ms").contains("127.0.0.1")
                 .doesNotContain("Menu secret").doesNotContain("secret title")
@@ -242,126 +240,6 @@ class CardEnrichmentServiceTest {
         assertThat(CardEnrichment.none().photoOrigin()).isNull();
         assertThat(CardEnrichment.photo(URI.create("https://x.test/a.jpg").toString(),
                 EnrichmentOutcome.LARGEST_PAGE_IMAGE).photoOrigin()).isEqualTo(EnrichmentOutcome.LARGEST_PAGE_IMAGE);
-    }
-
-    // ---- Amendment (b): Unsplash cuisine photo as the last resort (T31, T33-T36, T26 / plan OQ-6) ----
-
-    /** The service with Unsplash enabled, the local stub answering on the same fake site. */
-    private CardEnrichmentService withUnsplash() {
-        CardEnrichmentProperties unsplash = UnsplashStub.pointedAt(site, properties, UnsplashStub.KEY);
-        SafeWebFetcher fetcher = new SafeWebFetcher(unsplash, SafeWebFetcher::resolve,
-                address -> address.isLoopbackAddress() || SafeWebFetcher.isPublic(address));
-        return new CardEnrichmentService(fetcher, new WebsitePageReader(unsplash), new LargestImageRule(),
-                UnsplashStub.cuisinePhotos(unsplash, Clock.systemUTC()), unsplash, executor);
-    }
-
-    private List<String> unsplashQueries() {
-        return site.requests().stream().filter(r -> r.path().equals(UnsplashStub.SEARCH_PATH))
-                .map(FakeWebsite.Request::query).toList();
-    }
-
-    /** T31: no usable page image, the cuisine photo with its credit; query "Restaurant italien", lang fr. */
-    @Test
-    void withoutUsableImageTheCuisinePhotoIsUsed() {
-        site.html("/", page("", "<p>Bienvenue</p>"));
-        UnsplashStub.answers(site, UnsplashStub.answerOf(15));
-        CardEnrichmentService service = withUnsplash();
-
-        List<String> logs = infoLogs(() -> {
-            CardEnrichment enrichment = service.enrich(website("/"), "Restaurant italien");
-            assertThat(enrichment.photoOrigin()).isEqualTo(EnrichmentOutcome.UNSPLASH_CUISINE_PHOTO);
-            assertThat(enrichment.photoUrl()).startsWith("https://images.unsplash.test/photo-");
-            assertThat(enrichment.credit().unsplashUrl())
-                    .isEqualTo("https://unsplash.com/?utm_source=reco_resto&utm_medium=referral");
-        });
-
-        assertThat(unsplashQueries()).containsExactly("query=Restaurant italien&per_page=15&lang=fr");
-        assertThat(logs).singleElement().asString().contains("UNSPLASH_CUISINE_PHOTO")
-                .doesNotContain(UnsplashStub.KEY);
-    }
-
-    /** AS7: the checked page images all fail, the cuisine photo is used. */
-    @Test
-    void afterBrokenPageImagesTheCuisinePhotoIsUsed() {
-        site.html("/", page("<meta property=\"og:image\" content=\"/missing.jpg\">", T8_IMAGES));
-        UnsplashStub.answers(site, UnsplashStub.answerOf(15));
-
-        CardEnrichment enrichment = withUnsplash().enrich(website("/"), "Pizzeria");
-
-        assertThat(enrichment.photoOrigin()).isEqualTo(EnrichmentOutcome.UNSPLASH_CUISINE_PHOTO);
-        assertThat(site.paths()).containsExactly("/", "/missing.jpg", "/salle.jpg", "/plat.jpg",
-                UnsplashStub.SEARCH_PATH);
-    }
-
-    /** T33. */
-    @Test
-    void noUnsplashResultGivesNoPhoto() {
-        site.html("/", page("", ""));
-        UnsplashStub.answers(site, UnsplashStub.answer());
-        CardEnrichmentService service = withUnsplash();
-
-        List<String> logs = infoLogs(() -> assertThat(service.enrich(website("/"), "Pizzeria"))
-                .isEqualTo(CardEnrichment.none()));
-
-        assertThat(logs).singleElement().asString().contains("NO_CUISINE_PHOTO");
-    }
-
-    /** T34: limit reached. */
-    @Test
-    void aRefusedUnsplashRequestGivesNoPhoto() {
-        site.html("/", page("", ""));
-        site.on(UnsplashStub.SEARCH_PATH, exchange -> FakeWebsite.send(exchange, 429, "text/plain", new byte[0]));
-        CardEnrichmentService service = withUnsplash();
-
-        List<String> logs = infoLogs(() -> assertThat(service.enrich(website("/"), "Pizzeria"))
-                .isEqualTo(CardEnrichment.none()));
-
-        assertThat(logs).singleElement().asString().contains("UNSPLASH_UNAVAILABLE");
-    }
-
-    /** T35: a displayable sharing image, no Unsplash request. */
-    @Test
-    void aSharingImageSendsNoUnsplashRequest() {
-        site.html("/", page("<meta property=\"og:image\" content=\"/partage.jpg\">", "")).image("/partage.jpg");
-        UnsplashStub.answers(site, UnsplashStub.answerOf(15));
-
-        assertThat(withUnsplash().enrich(website("/"), "Pizzeria").photoOrigin())
-                .isEqualTo(EnrichmentOutcome.SHARING_IMAGE);
-        assertThat(unsplashQueries()).isEmpty();
-    }
-
-    /** A page image found, no Unsplash request. */
-    @Test
-    void aPageImageSendsNoUnsplashRequest() {
-        site.html("/", page("", T8_IMAGES)).image("/salle.jpg");
-        UnsplashStub.answers(site, UnsplashStub.answerOf(15));
-
-        assertThat(withUnsplash().enrich(website("/"), "Pizzeria").photoOrigin())
-                .isEqualTo(EnrichmentOutcome.LARGEST_PAGE_IMAGE);
-        assertThat(unsplashQueries()).isEmpty();
-    }
-
-    /** T36: no key, no request; the website outcome is kept. */
-    @Test
-    void withoutKeyNoUnsplashRequestIsSent() {
-        site.html("/", page("", ""));
-        UnsplashStub.answers(site, UnsplashStub.answerOf(15));
-
-        List<String> logs = infoLogs(() -> assertThat(service.enrich(website("/"), "Pizzeria"))
-                .isEqualTo(CardEnrichment.none()));
-
-        assertThat(logs).singleElement().asString().contains("NO_IMAGE");
-        assertThat(unsplashQueries()).isEmpty();
-    }
-
-    /** T26, plan OQ-6: a website that cannot be read gets no cuisine photo. */
-    @Test
-    void anUnreadableWebsiteSendsNoUnsplashRequest() {
-        site.on("/", exchange -> FakeWebsite.send(exchange, 500, "text/html", new byte[0]));
-        UnsplashStub.answers(site, UnsplashStub.answerOf(15));
-
-        assertThat(withUnsplash().enrich(website("/"), "Pizzeria")).isEqualTo(CardEnrichment.none());
-        assertThat(unsplashQueries()).isEmpty();
     }
 
     private static List<String> infoLogs(Runnable action) {

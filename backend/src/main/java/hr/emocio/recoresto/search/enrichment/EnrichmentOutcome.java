@@ -20,16 +20,10 @@ public enum EnrichmentOutcome {
     /** The website answers something other than an HTML page. */
     NOT_HTML,
     /** The 5 s budget is spent (FR-011, T24, T25). */
-    TIMEOUT,
-    /** Amendment (b): an Unsplash photo of the restaurant cuisine, with its credit (FR-013, T31). */
-    UNSPLASH_CUISINE_PHOTO,
-    /** Amendment (b): Unsplash answered no usable photo (T33). */
-    NO_CUISINE_PHOTO,
-    /** Amendment (b): Unsplash refused or failed: 429, other status, unreachable, unreadable answer (T34). */
-    UNSPLASH_UNAVAILABLE;
+    TIMEOUT;
 
     /** Whether the outcome gives a photo. */
     public boolean hasPhoto() {
-        return this == SHARING_IMAGE || this == LARGEST_PAGE_IMAGE || this == UNSPLASH_CUISINE_PHOTO;
+        return this == SHARING_IMAGE || this == LARGEST_PAGE_IMAGE;
     }
 }

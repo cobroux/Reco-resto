@@ -366,6 +366,6 @@ class SafeWebFetcherTest {
     void outcomesAreTheDataModelList() {
         assertThat(List.of(EnrichmentOutcome.values())).extracting(Enum::name).containsExactly("SHARING_IMAGE",
                 "LARGEST_PAGE_IMAGE", "NO_IMAGE", "NO_DISPLAYABLE_IMAGE", "UNREACHABLE", "BLOCKED_ADDRESS", "NOT_HTML",
-                "TIMEOUT", "UNSPLASH_CUISINE_PHOTO", "NO_CUISINE_PHOTO", "UNSPLASH_UNAVAILABLE");
+                "TIMEOUT");
     }
 }

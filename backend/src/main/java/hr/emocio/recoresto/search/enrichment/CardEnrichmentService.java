@@ -19,10 +19,7 @@ import org.springframework.stereotype.Service;
 /**
  * A photo for one restaurant card, taken from its website (spec 007, data-model.md "State flow"): the declared sharing
  * image when it answers as an image (FR-003), otherwise the largest page image that answers as an image, chosen by
- * {@link LargestImageRule} (FR-004, amendment (a): no language model), otherwise, when the page was read and an
- * Unsplash key is configured, an Unsplash photo of the restaurant cuisine ({@link CuisinePhotos}, amendment (b),
- * FR-013), otherwise no photo. Never an error (FR-012). A website that cannot be read gets no cuisine photo (plan
- * OQ-6).
+ * {@link LargestImageRule} (FR-004, amendment (a): no language model), otherwise no photo. Never an error (FR-012).
  * <p>
  * The whole work runs as a task on the bounded enrichment executor ({@code card-enrichment.executor-size}, PO-10) and
  * gets {@code card-enrichment.budget-seconds} from the call (FR-011, PO-4 a), queue wait included; at the deadline the
@@ -46,48 +43,38 @@ public class CardEnrichmentService {
         static Result photo(String url, EnrichmentOutcome origin) {
             return new Result(origin, CardEnrichment.photo(url, origin));
         }
-
-        static Result of(CardEnrichment enrichment) {
-            return new Result(enrichment.photoOrigin(), enrichment);
-        }
     }
 
     private final SafeWebFetcher fetcher;
     private final WebsitePageReader reader;
     private final LargestImageRule rule;
-    private final CuisinePhotos cuisinePhotos;
     private final CardEnrichmentProperties properties;
     private final ExecutorService executor;
 
     public CardEnrichmentService(SafeWebFetcher fetcher, WebsitePageReader reader, LargestImageRule rule,
-            CuisinePhotos cuisinePhotos, CardEnrichmentProperties properties,
+            CardEnrichmentProperties properties,
             @Qualifier("cardEnrichmentExecutor") ExecutorService executor) {
         this.fetcher = fetcher;
         this.reader = reader;
         this.rule = rule;
-        this.cuisinePhotos = cuisinePhotos;
         this.properties = properties;
         this.executor = executor;
     }
 
-    /**
-     * The photo of the card, or none.
-     *
-     * @param cuisine the cuisine shown on the card, only used for the Unsplash query; may be null (T38)
-     */
-    public CardEnrichment enrich(WebsiteAddress website, String cuisine) {
+    /** The photo of the card, or none. */
+    public CardEnrichment enrich(WebsiteAddress website) {
         long start = System.nanoTime();
         Deadline deadline = Deadline.after(Duration.ofSeconds(properties.budgetSeconds()));
-        Result result = runWithinBudget(website, cuisine, deadline);
+        Result result = runWithinBudget(website, deadline);
         log.info("Card enrichment {} in {} ms for {}", result.outcome(),
                 Duration.ofNanos(System.nanoTime() - start).toMillis(), website.host());
         return result.enrichment();
     }
 
-    private Result runWithinBudget(WebsiteAddress website, String cuisine, Deadline deadline) {
+    private Result runWithinBudget(WebsiteAddress website, Deadline deadline) {
         Future<Result> task;
         try {
-            task = executor.submit(() -> lastResort(enrichNow(website, deadline), website, cuisine, deadline));
+            task = executor.submit(() -> enrichNow(website, deadline));
         } catch (RejectedExecutionException e) {
             // Only when the application stops: no slot will ever be free within the budget.
             return Result.none(EnrichmentOutcome.TIMEOUT);
@@ -135,24 +122,6 @@ public class CardEnrichmentService {
             }
         }
         return Result.none(deadline.isSpent() ? EnrichmentOutcome.TIMEOUT : EnrichmentOutcome.NO_DISPLAYABLE_IMAGE);
-    }
-
-    /**
-     * Amendment (b): after {@code NO_IMAGE} or {@code NO_DISPLAYABLE_IMAGE} (the page was read, FR-003 and FR-004 gave
-     * nothing) and with a key, the Unsplash cuisine photo; any other result is kept as is.
-     */
-    private Result lastResort(Result website, WebsiteAddress address, String cuisine, Deadline deadline) {
-        boolean pageGaveNothing = website.outcome() == EnrichmentOutcome.NO_IMAGE
-                || website.outcome() == EnrichmentOutcome.NO_DISPLAYABLE_IMAGE;
-        if (!pageGaveNothing || !cuisinePhotos.isEnabled()) {
-            return website;
-        }
-        try {
-            return cuisinePhotos.photoFor(cuisine, address, deadline).map(Result::of)
-                    .orElseGet(() -> Result.none(EnrichmentOutcome.NO_CUISINE_PHOTO));
-        } catch (FetchException e) {
-            return Result.none(e.outcome());
-        }
     }
 
     private static URI uri(String address) {

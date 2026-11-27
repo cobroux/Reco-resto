@@ -68,7 +68,7 @@ describe('CardEnrichmentStore (spec 007, T25, T61)', () => {
     const [request] = pending();
     expect(request.request.method).toBe('GET');
     expect(request.request.params.get('website')).toBe('https://x.example/a b?c=1&d=2');
-    expect(request.request.params.get('cuisine')).toBe(restaurant.cuisine);
+    expect(request.request.params.keys()).toEqual(['website']);
     expect(request.request.urlWithParams).toContain('a%20b');
     expect(request.request.urlWithParams).toContain('%26d');
   });
@@ -134,29 +134,6 @@ describe('CardEnrichmentStore (spec 007, T25, T61)', () => {
     await flushPromises();
 
     expect(store.photo(restaurant.website)).toEqual({ url: 'https://cdn.example/salle.jpg' });
-  });
-
-  it('keeps the Unsplash credit next to the photo (T61, contract PhotoCredit)', async () => {
-    const restaurant = withWebsite(0);
-    const credit = {
-      photographerName: 'Jane Doe',
-      photographerUrl: 'https://unsplash.com/@janedoe?utm_source=reco_resto&utm_medium=referral',
-      unsplashUrl: 'https://unsplash.com/?utm_source=reco_resto&utm_medium=referral',
-    };
-    store.request([restaurant]);
-
-    pending()[0].flush({
-      photoUrl: 'https://images.unsplash.com/photo-1',
-      photoOrigin: 'UNSPLASH_CUISINE_PHOTO',
-      credit,
-    });
-    FakeImage.last().onload!();
-    await flushPromises();
-
-    expect(store.photo(restaurant.website)).toEqual({
-      url: 'https://images.unsplash.com/photo-1',
-      credit,
-    });
   });
 
   it('gives no photo when the browser cannot load the image (T9)', async () => {
