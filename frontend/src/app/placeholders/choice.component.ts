@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DeckStore } from '../deck/deck.store';
 import { DECK_TEXTS, RESULTS_TEXTS } from '../deck/deck.texts';
@@ -16,18 +16,22 @@ import { SessionReactionsService } from '../session/session-reactions.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ChoiceComponent {
+  private readonly searchResult = inject(SearchResultStore);
   protected readonly store = inject(DeckStore);
   protected readonly texts = DECK_TEXTS;
   protected readonly results = RESULTS_TEXTS;
   protected readonly expanded = signal(false);
 
-  protected readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id') ?? '';
+  /** Device position of the search, shown on the map of the tile. */
+  protected readonly userPosition = computed(() => this.searchResult.result()?.userPosition ?? null);
+
+  protected readonly id =inject(ActivatedRoute).snapshot.paramMap.get('id') ?? '';
   protected readonly item = (() => {
     const restaurant = inject(SessionReactionsService).restaurant(this.id);
     if (this.store.state()?.status !== 'picked') {
       return null;
     }
-    const targetDateTime = inject(SearchResultStore).result()?.targetDateTime ?? '';
+    const targetDateTime = this.searchResult.result()?.targetDateTime ?? '';
     return restaurant ? toRestaurantView(restaurant, targetDateTime) : null;
   })();
 

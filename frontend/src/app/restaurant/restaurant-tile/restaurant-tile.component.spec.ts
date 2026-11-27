@@ -1,5 +1,8 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { of } from 'rxjs';
+import { vi } from 'vitest';
+import { WalkingRouteService } from '../../map/walking-route.service';
 import { DECK_TEXTS, RESULTS_TEXTS } from '../../deck/deck.texts';
 import { STUB_RESTAURANTS } from '../../deck/stub/stub-restaurants';
 import { Restaurant } from '../restaurant';
@@ -26,7 +29,15 @@ class HostComponent {
   toggles = 0;
 }
 
+vi.mock('maplibre-gl', async () => (await import('../../map/maplibre-gl.mock')).maplibreMock);
+
 describe('RestaurantTileComponent', () => {
+  beforeEach(() =>
+    TestBed.configureTestingModule({
+      providers: [{ provide: WalkingRouteService, useValue: { route: () => of(null) } }],
+    }),
+  );
+
   function setup(restaurant: Restaurant = STUB_RESTAURANTS[0]) {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.item.set(toRestaurantView(restaurant, ''));
@@ -54,6 +65,29 @@ describe('RestaurantTileComponent', () => {
     const without = setup({ ...STUB_RESTAURANTS[0], photoUrl: undefined }).root;
     expect(without.querySelector('.tablecloth')).not.toBeNull();
     expect(without.querySelector('img')).toBeNull();
+  });
+
+  it('shows the map instead of the tablecloth when there is no photo but a location', async () => {
+    const { fixture, root } = setup({
+      ...STUB_RESTAURANTS[0],
+      photoUrl: undefined,
+      location: { latitude: 48.85, longitude: 2.35 },
+    });
+    await fixture.whenStable();
+    expect(root.querySelector('[data-testid="top-map"]')?.getAttribute('aria-label')).toBe(
+      RESULTS_TEXTS.mapLabel(STUB_RESTAURANTS[0].name),
+    );
+    expect(root.querySelector('.tablecloth')).toBeNull();
+  });
+
+  it('keeps the photo over the map when both exist', () => {
+    const { root } = setup({
+      ...STUB_RESTAURANTS[0],
+      photoUrl: 'https://x/p.jpg',
+      location: { latitude: 48.85, longitude: 2.35 },
+    });
+    expect(root.querySelector('img.photo')).not.toBeNull();
+    expect(root.querySelector('[data-testid="top-map"]')).toBeNull();
   });
 
   it('reads the suggestion badge, then "On y va" once decided', () => {

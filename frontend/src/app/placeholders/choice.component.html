@@ -10,6 +10,7 @@
       [item]="view"
       [decided]="true"
       [expanded]="expanded()"
+      [userPosition]="userPosition()"
       (toggleDetail)="toggleDetail()"
     >
       <a class="primary-btn" data-testid="itinerary" [routerLink]="['/route', id]">{{

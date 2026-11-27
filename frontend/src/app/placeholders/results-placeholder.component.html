@@ -39,6 +39,7 @@
       [item]="item"
       [decided]="decided()"
       [expanded]="expandedId() === item.id"
+      [userPosition]="userPosition()"
       (toggleDetail)="toggleDetail(item.id)"
     >
       @if (decided()) {
