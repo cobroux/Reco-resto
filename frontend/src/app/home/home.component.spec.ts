@@ -138,6 +138,20 @@ describe('HomeComponent', () => {
       expect(navigate).toHaveBeenCalledWith(['/deck']);
     });
 
+    it('opens the deck on the first result, then hands the updated one to the store without navigating again', async () => {
+      await type("italien ce soir près d'Opéra");
+      await clickSubmit();
+      const updated = { ...STUB_DECK_INPUT };
+
+      searchEnd.next(STUB_DECK_INPUT);
+      searchEnd.next(updated);
+      await fixture.whenStable();
+
+      expect(navigate).toHaveBeenCalledTimes(1);
+      expect(TestBed.inject(SearchResultStore).result()).toBe(updated);
+      expect(TestBed.inject(SearchResultStore).predecessorOf(updated)).toBe(STUB_DECK_INPUT);
+    });
+
     it('T2: stays on the home screen with the in-progress indication before the search answers', async () => {
       await type("italien ce soir près d'Opéra");
       await clickSubmit();

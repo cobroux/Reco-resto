@@ -1,4 +1,5 @@
 import { Restaurant } from '../restaurant/restaurant';
+import { Position } from '../search/search-result';
 
 export type ReactionKind = 'liked' | 'disliked' | 'picked';
 
@@ -14,6 +15,8 @@ export interface DeckInput {
   readonly momentLabel: string | null;
   /** Targeted local date-time of the search place, ISO 8601 ("2026-11-27T20:00:00+01:00"). */
   readonly targetDateTime: string;
+  /** Device position when the user granted it; the results map shows it. Absent or null: unknown. */
+  readonly userPosition?: Position | null;
   /** Ranked, most relevant first; already open at the targeted moment and with a known address. */
   readonly restaurants: readonly Restaurant[];
 }

@@ -3,10 +3,17 @@
   --color-page: #f5f3fc;
   --color-panel: #e9e5fd;
   --color-primary: #5b4bc4;
+  --color-primary-strong: #4a3ba8;
   --color-text: #23202e;
   --color-muted: #4e4960;
   --color-placeholder: #6a6578;
   --color-white: #ffffff;
+  /* Flat map of the results screen (read by map-style.ts; the route uses --color-primary). */
+  --map-ground: #e9e6f4;
+  --map-building: #e1def0;
+  --map-park: #e0f1df;
+  --map-water: #d9e6f8;
+  --map-road: #ffffff;
   --font-sans: 'Outfit', system-ui, sans-serif;
   /* Gingham of the Nappe logo, single source for the logo, the missing-photo visual (D16, swipe card),
      the tablecloth (D20) and the logo of the results screen. Tile size is set by each user with background-size. */

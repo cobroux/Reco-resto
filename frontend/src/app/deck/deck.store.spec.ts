@@ -97,6 +97,39 @@ describe('DeckStore', () => {
     });
   });
 
+  describe('walking distances arriving after the deck opened', () => {
+    it('takes the new distances without losing the progress of the deck', () => {
+      setUp(5);
+      store.react('liked');
+      const previous = results.result()!;
+      const updated: DeckInput = {
+        ...previous,
+        restaurants: previous.restaurants.map((r) => ({ ...r, distanceMeters: 999 })),
+      };
+
+      results.replace(previous, updated);
+      TestBed.tick();
+
+      expect(store.input()).toBe(updated);
+      expect(current()).toBe('r2');
+      expect(position(store.state()!)).toBe(2);
+      expect(currentCard(store.state()!)?.distanceMeters).toBe(999);
+      expect(store.state()!.shown[0].reaction).toBe('liked');
+    });
+
+    it('still starts a fresh deck on an unrelated new search', () => {
+      setUp(5);
+      store.react('liked');
+
+      newSearch();
+      TestBed.tick();
+      store.start();
+
+      expect(current()).toBe('nr1');
+      expect(position(store.state()!)).toBe(1);
+    });
+  });
+
   describe('new search (FR-020)', () => {
     it('T3: starts a new deck from the new result and discards the previous reactions', () => {
       setUp(5);

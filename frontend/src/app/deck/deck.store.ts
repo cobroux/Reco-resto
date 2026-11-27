@@ -1,4 +1,4 @@
-import { Injectable, Signal, inject, signal } from '@angular/core';
+import { Injectable, Signal, effect, inject, signal, untracked } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   Observable,
@@ -28,6 +28,7 @@ import {
   recordReaction,
   refinementRequest,
   rewind,
+  swapRestaurants,
 } from './deck-state';
 import { DeckInput, ReactionKind } from './deck.types';
 import { RefinementService } from './refinement.service';
@@ -54,6 +55,22 @@ export class DeckStore {
   readonly input: Signal<DeckInput | null> = this.inputValue.asReadonly();
   /** True while waiting for a refinement result; reactions are ignored meanwhile (D2). */
   readonly pending: Signal<boolean> = this.pendingValue.asReadonly();
+
+  constructor() {
+    // The walking distances arrive after the deck opened: the deck keeps its progress and takes the new distances.
+    effect(() => {
+      const next = this.results.result();
+      untracked(() => {
+        const current = this.inputValue();
+        if (next && current && next !== current && this.results.predecessorOf(next) === current) {
+          this.inputValue.set(next);
+          this.stateValue.update((state) =>
+            state ? swapRestaurants(state, current.restaurants, next.restaurants) : state,
+          );
+        }
+      });
+    });
+  }
 
   /**
    * Builds the deck once per search result: a new result starts a new deck and discards the previous

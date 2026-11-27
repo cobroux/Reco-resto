@@ -2,6 +2,16 @@
   <div class="hero">
     @if (item().restaurant.photoUrl; as photo) {
       <img class="photo" [src]="photo" alt="" />
+    } @else if (item().restaurant.location; as location) {
+      <app-restaurant-map
+        data-testid="top-map"
+        [restaurant]="location"
+        [name]="item().restaurant.name"
+        [user]="userPosition()"
+        [caption]="item().distance"
+        [label]="results.mapLabel(item().restaurant.name)"
+        [recenterLabel]="results.recenterMap"
+      />
     } @else {
       <div class="tablecloth" aria-hidden="true"></div>
     }

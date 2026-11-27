@@ -1,22 +1,35 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
+import { of } from 'rxjs';
 import { vi } from 'vitest';
 import { DeckStore } from '../deck/deck.store';
 import { DECK_TEXTS } from '../deck/deck.texts';
-import { STUB_RESTAURANTS } from '../deck/stub/stub-restaurants';
+import { STUB_DECK_INPUT, STUB_RESTAURANTS } from '../deck/stub/stub-restaurants';
+import { provideNoWalkingRoute } from '../map/walking-route.testing';
+import { Restaurant } from '../restaurant/restaurant';
+import { Position } from '../search/search-result';
+import { SearchResultStore } from '../search/search-result.store';
 import { SessionReactionsService } from '../session/session-reactions.service';
 import { ChoiceComponent } from './choice.component';
+
+vi.mock('maplibre-gl', async () => (await import('../map/maplibre-gl.mock')).maplibreMock);
 
 describe('ChoiceComponent', () => {
   let returnFromPick: ReturnType<typeof vi.fn>;
   let navigate: ReturnType<typeof vi.spyOn>;
 
-  async function render(id: string, status = 'picked') {
+  async function render(
+    id: string,
+    status = 'picked',
+    override?: Restaurant,
+    userPosition?: Position,
+  ) {
     returnFromPick = vi.fn();
     TestBed.configureTestingModule({
       imports: [ChoiceComponent],
       providers: [
         provideRouter([]),
+        provideNoWalkingRoute(),
         { provide: DeckStore, useValue: { returnFromPick, state: () => ({ status }) } },
         {
           provide: ActivatedRoute,
@@ -24,7 +37,11 @@ describe('ChoiceComponent', () => {
         },
       ],
     });
-    TestBed.inject(SessionReactionsService).set(STUB_RESTAURANTS, []);
+    TestBed.inject(SearchResultStore).set({ ...STUB_DECK_INPUT, userPosition });
+    TestBed.inject(SessionReactionsService).set(
+      override ? STUB_RESTAURANTS.map((r) => (r.id === override.id ? override : r)) : STUB_RESTAURANTS,
+      [],
+    );
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     const fixture = TestBed.createComponent(ChoiceComponent);
     await fixture.whenStable();
@@ -37,6 +54,18 @@ describe('ChoiceComponent', () => {
     expect(root.querySelectorAll('[data-testid="top-card"]')).toHaveLength(1);
     expect(root.querySelector('.card-name')?.textContent).toContain(STUB_RESTAURANTS[1].name);
     expect(root.querySelector('.badge')?.textContent).toContain(DECK_TEXTS.pick);
+  });
+
+  it('shows the map of the restaurant and the user when it has a location and no photo', async () => {
+    const { root } = await render(
+      'stub-02',
+      'picked',
+      { ...STUB_RESTAURANTS[1], photoUrl: undefined, location: { latitude: 48.85, longitude: 2.35 } },
+      { latitude: 48.86, longitude: 2.34 },
+    );
+
+    expect(root.querySelector('[data-testid="top-map"]')).not.toBeNull();
+    expect(root.querySelector('.tablecloth')).toBeNull();
   });
 
   it('links the itinerary to the route screen', async () => {

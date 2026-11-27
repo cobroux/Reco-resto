@@ -1,6 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { of } from 'rxjs';
 import { vi } from 'vitest';
+import { provideNoWalkingRoute } from '../map/walking-route.testing';
 import { DECK_TEXTS, RESULTS_TEXTS } from '../deck/deck.texts';
 import { ReactionKind } from '../deck/deck.types';
 import { formatDistance } from '../deck/format/distance';
@@ -9,6 +11,8 @@ import { STUB_DECK_INPUT, STUB_RESTAURANTS } from '../deck/stub/stub-restaurants
 import { SearchResultStore } from '../search/search-result.store';
 import { SessionReactionsService } from '../session/session-reactions.service';
 import { ResultsPlaceholderComponent } from './results-placeholder.component';
+
+vi.mock('maplibre-gl', async () => (await import('../map/maplibre-gl.mock')).maplibreMock);
 
 describe('ResultsPlaceholderComponent (results screen, mockup "Web 2c · Résultats")', () => {
   const [first, second, third, fourth, fifth] = STUB_RESTAURANTS;
@@ -35,7 +39,7 @@ describe('ResultsPlaceholderComponent (results screen, mockup "Web 2c · Résult
     await fixture.whenStable();
   }
 
-  beforeEach(() => TestBed.configureTestingModule({ providers: [provideRouter([])] }));
+  beforeEach(() => TestBed.configureTestingModule({ providers: [provideRouter([]), provideNoWalkingRoute()] }));
 
   describe('header', () => {
     beforeEach(() => open([[first.id, 'liked']]));
@@ -71,7 +75,7 @@ describe('ResultsPlaceholderComponent (results screen, mockup "Web 2c · Résult
 
     it('leaves the moment out of the title when the search had none, and does not pluralize one', async () => {
       TestBed.resetTestingModule();
-      TestBed.configureTestingModule({ providers: [provideRouter([])] });
+      TestBed.configureTestingModule({ providers: [provideRouter([]), provideNoWalkingRoute()] });
       await open([[first.id, 'liked']], null);
 
       expect(text('h1')).toBe('Vos 1 coup de cœur');
@@ -92,7 +96,7 @@ describe('ResultsPlaceholderComponent (results screen, mockup "Web 2c · Résult
 
     it('uses the Nappe gingham as image while the restaurant has no photo', async () => {
       TestBed.resetTestingModule();
-      TestBed.configureTestingModule({ providers: [provideRouter([])] });
+      TestBed.configureTestingModule({ providers: [provideRouter([]), provideNoWalkingRoute()] });
       TestBed.inject(SearchResultStore).set(STUB_DECK_INPUT);
       TestBed.inject(SessionReactionsService).set(
         [{ ...first, photoUrl: undefined }],
@@ -104,6 +108,32 @@ describe('ResultsPlaceholderComponent (results screen, mockup "Web 2c · Résult
 
       expect(q('[data-testid="top-card"] .tablecloth')).not.toBeNull();
       expect(q('[data-testid="top-card"] img')).toBeNull();
+    });
+
+    it('shows the map of the restaurant and the user instead of the gingham when it has a location', async () => {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ providers: [provideRouter([]), provideNoWalkingRoute()] });
+      TestBed.inject(SearchResultStore).set({
+        ...STUB_DECK_INPUT,
+        userPosition: { latitude: 48.86, longitude: 2.34 },
+      });
+      TestBed.inject(SessionReactionsService).set(
+        [{ ...first, photoUrl: undefined, location: { latitude: 48.85, longitude: 2.35 } }],
+        [{ restaurantId: first.id, kind: 'liked' }],
+      );
+      fixture = TestBed.createComponent(ResultsPlaceholderComponent);
+      root = fixture.nativeElement as HTMLElement;
+      await fixture.whenStable();
+
+      expect(q('[data-testid="top-map"]')).not.toBeNull();
+      expect(q('[data-testid="top-map"]')?.getAttribute('aria-label')).toBe(
+        RESULTS_TEXTS.mapLabel(first.name),
+      );
+      expect(q('[data-testid="top-card"] .tablecloth')).toBeNull();
+      expect(q('[data-testid="top-map"] [data-testid="map-caption"]')?.textContent).toBe(
+        formatDistance(first.distanceMeters),
+      );
+      expect(q('[data-testid="top-map"] [data-testid="recenter-map"]')).not.toBeNull();
     });
 
     it('lists the other "Miam" below, without "Voir à proximité"', () => {

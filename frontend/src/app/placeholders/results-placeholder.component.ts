@@ -73,6 +73,8 @@ export class ResultsPlaceholderComponent {
     this.items().filter((item) => item.kind === 'liked' && item !== this.top()),
   );
   protected readonly nopes = computed(() => this.items().filter((item) => item.kind === 'disliked'));
+  /** Device position of the search, shown on the map of the top card. */
+  protected readonly userPosition = computed(() => this.searchResult.result()?.userPosition ?? null);
   protected readonly nopeOpen = computed(() => this.nopeToggled() ?? this.top() === null);
 
   protected readonly title = computed(() => {
