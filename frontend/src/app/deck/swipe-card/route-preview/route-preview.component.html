@@ -17,5 +17,7 @@
       </ul>
     }
   }
-  <a class="full-route" [routerLink]="['/route', restaurant().id]">{{ texts.fullRoute }}</a>
+  <a class="full-route" [href]="mapsUrl()" target="_blank" rel="noopener noreferrer">{{
+    texts.fullRoute
+  }}</a>
 </div>

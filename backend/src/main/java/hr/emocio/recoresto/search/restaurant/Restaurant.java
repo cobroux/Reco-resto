@@ -36,9 +36,10 @@ public record Restaurant(String name, Position location, Integer distanceMeters,
                 photoSourceUri, attributions, reason);
     }
 
-    public Restaurant withReason(String newReason) {
+    /** The model's suggestion: why it picked the restaurant, and a dish to try there ("À goûter"). */
+    public Restaurant withSuggestion(String newReason, String newSignatureDish) {
         return new Restaurant(name, location, distanceMeters, cuisine, diets, keywords, priceLevel, openingHours,
-                photoUrl, signatureDish, address, phone, menu, website, placeId, photoAttributions, photoSourceUri,
+                photoUrl, newSignatureDish, address, phone, menu, website, placeId, photoAttributions, photoSourceUri,
                 attributions, newReason);
     }
 }

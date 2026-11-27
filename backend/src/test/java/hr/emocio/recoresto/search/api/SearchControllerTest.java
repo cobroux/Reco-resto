@@ -117,7 +117,7 @@ class SearchControllerTest {
     @Test
     void theReasonOfTheModelIsSerialized() throws Exception {
         when(service.search(any(), eq(false))).thenReturn(
-                new SearchResult(criteria, List.of(open("A").withReason("Burger maison")), null));
+                new SearchResult(criteria, List.of(open("A").withSuggestion("Burger maison", null)), null));
 
         mockMvc.perform(post("/api/search").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sentence\":\"burger\"}"))

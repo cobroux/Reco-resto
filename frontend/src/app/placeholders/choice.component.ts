@@ -4,6 +4,7 @@ import { DeckStore } from '../deck/deck.store';
 import { DECK_TEXTS, RESULTS_TEXTS } from '../deck/deck.texts';
 import { RestaurantTileComponent } from '../restaurant/restaurant-tile/restaurant-tile.component';
 import { toRestaurantView } from '../restaurant/restaurant-view';
+import { googleMapsRouteUrl } from '../restaurant/google-maps';
 import { SearchResultStore } from '../search/search-result.store';
 import { SessionReactionsService } from '../session/session-reactions.service';
 
@@ -20,6 +21,7 @@ export class ChoiceComponent {
   protected readonly store = inject(DeckStore);
   protected readonly texts = DECK_TEXTS;
   protected readonly results = RESULTS_TEXTS;
+  protected readonly mapsUrl = googleMapsRouteUrl;
   protected readonly expanded = signal(false);
 
   /** Device position of the search, shown on the map of the tile. */

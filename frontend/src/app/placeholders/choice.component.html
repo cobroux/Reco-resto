@@ -13,9 +13,14 @@
       [userPosition]="userPosition()"
       (toggleDetail)="toggleDetail()"
     >
-      <a class="primary-btn" data-testid="itinerary" [routerLink]="['/route', id]">{{
-        results.itinerary
-      }}</a>
+      <a
+        class="primary-btn"
+        data-testid="itinerary"
+        [href]="mapsUrl(view.restaurant)"
+        target="_blank"
+        rel="noopener noreferrer"
+        >{{ results.itinerary }}</a
+      >
       <button
         type="button"
         class="soft-btn"
