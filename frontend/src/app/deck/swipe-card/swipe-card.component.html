@@ -117,27 +117,6 @@
           </svg>
         </a>
       }
-      <!-- Spec 007, FR-015: Unsplash credit at the top-right, clear of the link, the distance and "Google Maps". -->
-      @if (credit(); as credit) {
-        <p class="credit" data-testid="unsplash-credit">
-          {{ texts.photoBy }}
-          <a
-            [href]="credit.photographerUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            draggable="false"
-            >{{ credit.photographerName }}</a
-          >
-          /
-          <a
-            [href]="credit.unsplashUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            draggable="false"
-            >{{ texts.unsplash }}</a
-          >
-        </p>
-      }
       <!-- Spec 008, FR-014 (D15): bottom-right (left of the flip button of spec 004), so the top-left corner stays free for the website link of spec 007. -->
       <div class="attribution" data-testid="google-attribution">
         <span class="google-maps" data-testid="google-maps" translate="no">{{

@@ -3,7 +3,6 @@ package hr.emocio.recoresto.search.api;
 import hr.emocio.recoresto.search.config.CardEnrichmentProperties;
 import hr.emocio.recoresto.search.enrichment.CardEnrichment;
 import hr.emocio.recoresto.search.enrichment.CardEnrichmentService;
-import hr.emocio.recoresto.search.enrichment.CuisinePhotos;
 import hr.emocio.recoresto.search.enrichment.WebsiteAddress;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -15,11 +14,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Photo of one restaurant card taken from its website, or an Unsplash photo of its cuisine as the last resort (spec
- * 007, amendment (b), contracts/card-enrichment.openapi.yaml). The website
- * must pass the single website rule (research R3), else 400 without body, as {@link PhotoController} does; a
- * {@code cuisine} longer than {@link CuisinePhotos#MAX_CUISINE_LENGTH} characters is also a 400 without body (it is
- * the Unsplash query, PR #15 review). Any
+ * Photo of one restaurant card taken from its website (spec 007, contracts/card-enrichment.openapi.yaml). The website
+ * must pass the single website rule (research R3), else 400 without body, as {@link PhotoController} does. Any
  * enrichment failure is a 200 without photo: the user never sees an error (FR-012).
  */
 @RestController
@@ -36,19 +32,15 @@ public class CardEnrichmentController {
         this.properties = properties;
     }
 
-    /**
-     * @param website the {@code Restaurant.website} of the search response
-     * @param cuisine the {@code Restaurant.cuisine} shown on the card, the Unsplash query of amendment (b); optional
-     */
+    /** @param website the {@code Restaurant.website} of the search response */
     @GetMapping
-    public ResponseEntity<CardEnrichment> enrich(@RequestParam(required = false) String website,
-            @RequestParam(required = false) String cuisine) {
+    public ResponseEntity<CardEnrichment> enrich(@RequestParam(required = false) String website) {
         Optional<WebsiteAddress> address = WebsiteAddress.parse(website, properties.allowedPorts());
-        if (address.isEmpty() || (cuisine != null && cuisine.length() > CuisinePhotos.MAX_CUISINE_LENGTH)) {
+        if (address.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
         try {
-            return ResponseEntity.ok(service.enrich(address.get(), cuisine));
+            return ResponseEntity.ok(service.enrich(address.get()));
         } catch (RuntimeException e) {
             log.warn("Card enrichment failed unexpectedly for {}: {}", address.get().host(),
                     e.getClass().getSimpleName());

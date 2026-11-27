@@ -12,6 +12,8 @@
 
 **Feature set**: this spec extends features 002 natural-language search (FR-012: photo "when available"), 003 swipe deck (US1 AS2–AS3: card front, tablecloth fallback) and 008 Google Places source (website address already in the response). It does not change 004 restaurant card details, 005 results map screen or 006 route to restaurant.
 
+**Amendment (c) (product owner, 2026-11-27)**: Unsplash is removed. Amendment (b) and FR-013 to FR-016 no longer apply: when the website gives no displayable photo, the card keeps the tablecloth. The other documents of this folder keep their Unsplash mentions as history.
+
 **Amendment (a) (product owner, 2026-11-26)**: the language model is no longer used for enrichment. The LLM provider limits the key to 1,500 tokens per minute, and one model call per card (about 1,200 tokens) would exhaust it and block the search itself. When the website declares no usable sharing image, the largest image of the page is used, chosen by a fixed rule. Image search APIs (option (b)) are not used. [Superseded by amendment (b).]
 
 **Amendment (b) (product owner, 2026-11-26)**: when neither the sharing image nor a page image gives a displayable photo, the card shows a free stock photo matching the restaurant cuisine, taken from the Unsplash API (free key, no payment, no language model, no token; it replaces Pexels, whose key issuance is paused). It is NOT a photo of the restaurant itself: it illustrates its cuisine. Only restaurants that have a website are concerned. Paid image search APIs (Brave) and Google Street View are not used. The Unsplash photo is credited on the card as the Unsplash guidelines ask (photographer and Unsplash).

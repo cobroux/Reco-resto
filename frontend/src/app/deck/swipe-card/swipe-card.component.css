@@ -120,8 +120,7 @@
   font-weight: 400;
 }
 
-.attribution a,
-.credit a {
+.attribution a {
   color: inherit;
 }
 
@@ -148,24 +147,6 @@
   stroke: currentColor;
   stroke-width: 2;
   stroke-linecap: round;
-}
-
-/* Unsplash credit (spec 007, FR-015): top-right, the only free corner (link top-left, distance
-   bottom-left, Google attribution bottom-right); same discreet look as the Google attribution. */
-.credit {
-  position: absolute;
-  right: 14px;
-  top: 14px;
-  max-width: calc(100% - 74px);
-  margin: 0;
-  padding: 4px 8px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.85);
-  color: #23202e;
-  font-size: 10px;
-  font-weight: 400;
-  line-height: 1.2;
-  text-align: right;
 }
 
 /* Drag feedback: the whole photo is tinted and a large tilted stamp sits in its centre, so the

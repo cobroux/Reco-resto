@@ -79,10 +79,6 @@ export class SwipeCardComponent {
     const url = this.shownPhoto()?.url;
     return url && url !== this.failedPhoto() ? url : undefined;
   });
-  /** Unsplash credit, only while its photo is shown (spec 007, FR-015, T41). */
-  protected readonly credit = computed(() =>
-    this.photo() ? this.shownPhoto()?.credit : undefined,
-  );
   protected readonly distance = computed(() => formatDistance(this.restaurant().distanceMeters));
   protected readonly closingTime = computed(() =>
     closingTimeAt(this.restaurant().weeklyHours, this.targetDateTime()),
@@ -186,7 +182,7 @@ export class SwipeCardComponent {
     if (this.leaving() || this.disabled() || event.button !== 0 || event.isPrimary === false) {
       return;
     }
-    // Buttons and links (flip, Itinéraire; Google attribution of spec 008, website link and Unsplash credit of
+    // Buttons and links (flip, Itinéraire; Google attribution of spec 008, website link of
     // spec 007) handle their own click: they never start a drag or a tap (capturing the pointer would steal it).
     if ((event.target as Element | null)?.closest?.('button, a')) {
       return;

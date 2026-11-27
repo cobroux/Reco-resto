@@ -17,7 +17,7 @@ import java.util.concurrent.Executors;
 
 /**
  * A local fake website (JDK {@code HttpServer} on the loopback address) for the enrichment tests: no real site is
- * ever contacted; also the local Unsplash stub. Every request is recorded with its path, query and headers. Content is invented, NOT real data.
+ * ever contacted. Every request is recorded with its path, query and headers. Content is invented, NOT real data.
  */
 final class FakeWebsite implements AutoCloseable {
 

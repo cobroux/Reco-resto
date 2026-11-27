@@ -123,15 +123,3 @@ card-enrichment:
   user-agent: ${CARD_ENRICHMENT_USER_AGENT:RecoResto/0.1 (proof of concept)}
   # PO-10 (2): 8 enrichments at the same time; the others wait, and the wait counts in the budget.
   executor-size: ${CARD_ENRICHMENT_EXECUTOR_SIZE:8}
-  # Amendment (b): Unsplash cuisine photo when the website gives no displayable photo (plan "Amendment (b) (Unsplash)").
-  unsplash:
-    # Documented endpoint of the Unsplash API (research R14).
-    base-url: ${CARD_ENRICHMENT_UNSPLASH_BASE_URL:https://api.unsplash.com}
-    # Server only, never committed with a value; no default value; blank = no Unsplash request (FR-014, T36).
-    access-key: ${UNSPLASH_ACCESS_KEY:}
-    # FR-015: utm_source of the credit links.
-    app-name: ${CARD_ENRICHMENT_UNSPLASH_APP_NAME:reco_resto}
-    # FR-013: the photo is chosen among the first 15 results.
-    per-page: ${CARD_ENRICHMENT_UNSPLASH_PER_PAGE:15}
-    # FR-016: the answer of one query is reused for 1 hour (memory only).
-    cache-ttl: ${CARD_ENRICHMENT_UNSPLASH_CACHE_TTL:1h}

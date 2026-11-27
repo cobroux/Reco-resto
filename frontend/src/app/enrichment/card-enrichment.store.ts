@@ -82,7 +82,7 @@ export class CardEnrichmentStore {
     const website = restaurant.website!;
     this.inFlight++;
     this.setState(website, { status: 'pending' });
-    const params = new HttpParams({ fromObject: { website, cuisine: restaurant.cuisine } });
+    const params = new HttpParams({ fromObject: { website } });
     this.http
       .get<CardEnrichment>(CARD_ENRICHMENT_URL, { params })
       .pipe(
@@ -108,7 +108,7 @@ export class CardEnrichmentStore {
     void preload(url).then((loaded) =>
       this.setState(
         website,
-        loaded ? { status: 'photo', photo: { url, credit: answer.credit } } : { status: 'none' },
+        loaded ? { status: 'photo', photo: { url } } : { status: 'none' },
       ),
     );
   }
